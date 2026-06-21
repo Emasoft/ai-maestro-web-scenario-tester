@@ -108,6 +108,7 @@ if [ -z "$REG" ] || [ -z "$TEST_AGENT_PATTERN" ]; then
   echo "$LOG_PREFIX   no registryScanPath/testAgentPattern configured — skipping"
 else
   # Expand a leading ~ in the configured path.
+  # shellcheck disable=SC2088  # "~/" is a literal case-pattern match here, not an expansion
   case "$REG" in
     "~/"*) REG="$HOME/${REG#~/}" ;;
     "~") REG="$HOME" ;;

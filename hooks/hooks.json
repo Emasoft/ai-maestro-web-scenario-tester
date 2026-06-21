@@ -1,0 +1,15 @@
+{
+  "description": "web-scenario-tester hooks. The write-guard is SENTINEL-GATED: it is inert unless ${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json exists (the run owner writes it at scenario-run start and deletes it at run end), so this plugin-scoped PreToolUse does nothing outside an active scenario run.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "_id": "amwst-write-guard",
+        "_description": "During an active scenario run, block scenario subagents from writing outside the project root / scratch / configured allowlist (closes the isolation:worktree process-escape gap).",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/amwst_subagent-write-guard.sh", "timeout": 10000 }
+        ]
+      }
+    ]
+  }
+}

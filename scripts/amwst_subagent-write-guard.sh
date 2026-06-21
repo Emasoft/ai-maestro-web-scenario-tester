@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
 # ────────────────────────────────────────────────────────────────────
-# amwst_subagent-write-guard.sh.template — GENERIC project write-guard
+# amwst_subagent-write-guard.sh — ACTIVE plugin write-guard (PreToolUse)
 #
-# This is a TEMPLATE. `init-scenarios-folder.sh` installs it into the
-# consuming project at  .claude/scripts/subagent-write-guard.sh  (the
-# `.template` suffix dropped). It is wired as a PreToolUse hook on the
-# PROJECT-SCOPED scenario subagent shadows (see references/write-guard-rule.md
-# for why a project shadow + .claude/scripts/ is the only place a write-guard
-# hook can live — plugin-shipped agents CANNOT carry a `hooks:` field).
+# Wired by THIS plugin's hooks/hooks.json as a PreToolUse hook (matcher
+# Write|Edit|MultiEdit|NotebookEdit|Bash). Plugin hooks are plugin-SCOPED:
+# they load for every session that has the plugin enabled — which would be
+# far too broad for a write-guard. The SENTINEL GATE below makes that safe.
 #
-# PURPOSE
+# SENTINEL GATE
+#   The hook is INERT unless a scenario run is active. The run owner
+#   (amwst-run-scenario / amwst-run-scenarios-batch / the main agent) writes
+#       ${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json
+#   when it STARTS a run and DELETES it when the run COMPLETES. With no
+#   sentinel the hook exits 0 immediately and does nothing — so normal
+#   (non-scenario) work in any project with this plugin enabled is untouched.
+#   (The sentinel file is gitignored; the tester adds it to .gitignore.)
+#
+# PURPOSE (only while a run is active)
 #   Scenario subagents may only WRITE to:
-#     1. $CLAUDE_PROJECT_DIR  — the project root (runner) or the subagent's
+#     1. $CLAUDE_PROJECT_DIR — the project root (runner) or the subagent's
 #        git worktree (implementer, via isolation: worktree)
 #     2. System scratch — /tmp, /private/tmp, /var/folders
 #     3. Any extra roots listed in scenarios.config.json "writeGuardAllowlist"
@@ -26,7 +33,7 @@
 #   redirection, rm/mv/cp/mkdir/touch/tee/chmod/chown/dd/install/ln/sed -i).
 #
 # EXIT CODES
-#   0 — allow the tool call
+#   0 — allow the tool call (also: no active scenario run → inert)
 #   2 — block the tool call (stderr becomes the reason shown to Claude)
 #
 # DEPENDENCIES
@@ -36,15 +43,22 @@
 
 set -euo pipefail
 
+# ── SENTINEL GATE — do nothing unless a scenario run is active ──
+# Checked FIRST (before reading stdin) so the overwhelming common case — any
+# tool call when no scenario is running — costs almost nothing.
+SENTINEL="${CLAUDE_PROJECT_DIR:-}/.claude/scenario_is_running.json"
+if [ -z "${CLAUDE_PROJECT_DIR:-}" ] || [ ! -f "$SENTINEL" ]; then
+    exit 0
+fi
+
 # Read hook JSON from stdin and pull fields via python3 — portable, no jq.
 # The JSON is passed to python3 through an env var (HOOK_JSON) rather than
 # interpolated into the heredoc, so quotes/backslashes in the command string
-# can never break the parser. This script is directly installable as-is.
+# can never break the parser.
 INPUT=$(cat)
 
 json_field() {
-  # json_field <dotted.path>
-  # Usage: json_field tool_name  /  json_field tool_input.file_path
+  # json_field <dotted.path>   e.g. json_field tool_input.file_path
   HOOK_JSON="$INPUT" python3 - "$1" <<'PYEOF'
 import json, os, sys
 path = sys.argv[1].split(".")
@@ -81,7 +95,6 @@ else
 fi
 
 # ── EXTRA ALLOWLIST from scenarios.config.json "writeGuardAllowlist" ──
-# These are additional absolute write-roots the consumer explicitly permits.
 SCENARIOS_SUBDIR="${SCENARIOS_DIR_REL:-tests/scenarios}"
 CONFIG_FILE="$PROJECT_ROOT_ABS/$SCENARIOS_SUBDIR/scenarios.config.json"
 EXTRA_ALLOW=""
@@ -95,7 +108,6 @@ try:
     if isinstance(roots, list):
         for r in roots:
             if isinstance(r, str) and r.strip():
-                # Expand a leading ~/
                 if r.startswith("~/"):
                     r = os.path.expanduser(r)
                 print(r.rstrip("/"))
@@ -156,30 +168,23 @@ is_allowed_path() {
         done <<< "$EXTRA_ALLOW"
     fi
 
-    # ── PROJECT EXTENSION EXAMPLE (commented; uncomment + adapt if needed) ──
+    # ── PROJECT EXTENSION EXAMPLE (commented; prefer "writeGuardAllowlist") ──
     # If your scenarios legitimately write into per-test working dirs created
     # OUTSIDE the project (e.g. a test-entity sandbox under $HOME), allow them
-    # with a TIGHT pattern that matches ONLY test artifacts, never real data.
-    # AI Maestro's concrete guard, for example, allowed test-agent workdirs:
-    #
+    # with a TIGHT pattern that matches ONLY test artifacts, never real data:
     #   case "$abs" in
     #       "$HOME"/agents/scen[0-9]*|"$HOME"/agents/scen[0-9]*/*) return 0 ;;
-    #       "$HOME"/agents/scen-[0-9]*|"$HOME"/agents/scen-[0-9]*/*) return 0 ;;
     #   esac
-    #
-    # Prefer adding such roots to "writeGuardAllowlist" in scenarios.config.json
-    # over editing this script — keep the engine generic.
+    # Prefer adding such roots to "writeGuardAllowlist" over editing this script.
 
     return 1
 }
 
-# Strip single/double/bare heredoc bodies before scanning a Bash command.
-# A heredoc body (<<'EOF' / <<"EOF" / <<EOF) is a literal stdin string and
-# cannot contain real shell constructs, so scanning it false-positives on:
-#   * JS regex literals  /foo|bar/i
-#   * JS fat-arrows       .filter(el => ...)   (the => looks like a > redirect)
-#   * absolute paths inside JS/Python string literals
-# This matters a LOT here: every dev-browser call is a `<<'EOF' … EOF` script.
+# Strip heredoc bodies before scanning a Bash command. A heredoc body
+# (<<'EOF' / <<"EOF" / <<EOF) is a literal stdin string and cannot contain real
+# shell constructs, so scanning it false-positives on JS regex literals, JS
+# fat-arrows (=> looks like a > redirect), and abs paths inside string literals.
+# This matters a LOT: every dev-browser call is a `<<'EOF' … EOF` script.
 strip_heredoc_bodies() {
     local input="$1"
     local output=""
@@ -248,30 +253,13 @@ case "$TOOL_NAME" in
         # ── PROJECT EXTENSION EXAMPLE — Rule-0 anti-bypass guards (commented) ──
         # The GENERIC guard below only enforces the WRITE-ROOT allowlist. If your
         # app exposes a mutating HTTP API or tmux test sessions, you may ALSO want
-        # to stop subagents from bypassing the UI (Rule 6). AI Maestro's concrete
-        # guard added blocks like these — adapt the endpoint/session patterns to
-        # YOUR app, or delete this block if not applicable:
-        #
-        #   # Block curl mutations of your app's state endpoints (UI-only via Rule 6):
+        # to stop subagents from bypassing the UI (Rule 6). Adapt to YOUR app:
         #   if echo "$CMD_SCAN" | grep -qE 'curl[^|;&]*(-X[[:space:]]+)?(DELETE|POST|PATCH|PUT)[^|;&]*(/api/(records|projects|accounts))'; then
-        #       block "Rule 0: subagent attempted curl mutation of app endpoints. Use the UI (dev-browser) instead."
-        #   fi
-        #   # Block tmux kill-session on non-test sessions:
-        #   while IFS= read -r tmux_target; do
-        #       [ -z "$tmux_target" ] && continue
-        #       case "$tmux_target" in
-        #           myapp-test-*) : ;;  # allowed
-        #           *) block "Rule 0: 'tmux kill-session -t $tmux_target' on non-test session. Forbidden." ;;
-        #       esac
-        #   done < <(echo "$CMD_SCAN" | grep -oE 'tmux[[:space:]]+kill-session[[:space:]]+(-t[[:space:]]+)?[^[:space:]&|;()"'"'"']+' | sed -E 's/^tmux[[:space:]]+kill-session[[:space:]]+(-t[[:space:]]+)?//' || true)
-        #   # Block direct JSON-state writes (force UI mutations):
-        #   if echo "$CMD_SCAN" | grep -qE '(>[[:space:]]*|tee[[:space:]]+)[^[:space:]]*(your-state-file\.json)'; then
-        #       block "Rule 0: subagent attempted direct state-file write. Use the UI."
+        #       block "Rule 0: subagent attempted curl mutation of app endpoints. Use the UI (dev-browser)."
         #   fi
         # ──────────────────────────────────────────────────────────────────────
 
         # 1. `cd /absolute/path` outside the allowlist — the primary escape vector.
-        #    Relative `cd` (e.g. `cd tests/scenarios`) is implicitly under cwd → allowed.
         while IFS= read -r cd_path; do
             [ -z "$cd_path" ] && continue
             is_allowed_path "$cd_path" || block "Bash 'cd' to forbidden dir: $cd_path"
@@ -296,7 +284,6 @@ case "$TOOL_NAME" in
         )
 
         # 3. File redirection `> /abs/path` / `>> /abs/path` outside the allowlist.
-        #    /dev/null and friends are whitelisted inside is_allowed_path.
         while IFS= read -r redir_path; do
             [ -z "$redir_path" ] && continue
             is_allowed_path "$redir_path" || block "Bash redirection target: $redir_path"
@@ -328,6 +315,7 @@ case "$TOOL_NAME" in
                         *) last_pos="$tok" ;;
                     esac
                 done
+                # shellcheck disable=SC2088  # '~/' here are literal case-patterns (a cp/mv/ln dest), not expansions
                 case "$last_pos" in
                     /*|'~/'*|'~')
                         is_allowed_path "$last_pos" || block "Bash cp/mv/ln/install destination outside allowed roots: $last_pos"
