@@ -68,6 +68,25 @@ except Exception:
 PYEOF
 }
 
+# Step 0: delete the write-guard run sentinel (belt-and-braces).
+# The run owner deletes it at run end, but a crashed/killed run can leave it
+# behind — which would keep the plugin's sentinel-gated write-guard ARMED for
+# every later (non-scenario) session in this project. Remove it unconditionally
+# here so master-cleanup always disarms the guard. Idempotent: `rm -f` no-ops
+# when the file is absent.
+SENTINEL="$MAIN_ROOT/.claude/scenario_is_running.json"
+echo "$LOG_PREFIX step 0: clear write-guard run sentinel"
+if [ -f "$SENTINEL" ]; then
+  if [ "$DRY_RUN" -eq 0 ]; then
+    rm -f "$SENTINEL"
+    echo "$LOG_PREFIX   removed $SENTINEL"
+  else
+    echo "$LOG_PREFIX   would remove $SENTINEL"
+  fi
+else
+  echo "$LOG_PREFIX   none — guard already disarmed"
+fi
+
 # Step 1: stop dev-browser
 echo "$LOG_PREFIX step 1: stop dev-browser daemon"
 if [ "$DRY_RUN" -eq 0 ]; then

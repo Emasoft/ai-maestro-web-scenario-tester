@@ -52,6 +52,8 @@ Specifically:
 
 **Belt-and-braces at delete time.** `DeleteAgent` in `services/element-management-service.ts:4771-4786` refuses `alsoDeleteFolder=true` when `agent.workingDirectory` is not under `~/agents/`. This means that even if a stale registry entry exists with `workingDirectory = ~/ai-maestro/` (as happened with legacy `_aim-*` service agents), clicking "Delete Agent with folder" on that entry CANNOT destroy the ai-maestro source tree — the pipeline refuses and only removes the registry entry. Still, a scenario must NEVER intentionally click delete on such an entry — it's a Rule 0 violation. The app guard is the second line; the first line is: don't go there.
 
+**Subagent write-guard (sentinel-gated).** The plugin ships a PreToolUse write-guard that confines scenario subagents to the project root / scratch. It is **inert** unless `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json` exists — the run owner (the run/batch skill) creates it at run start and deletes it at run end (gitignored). So the guard is armed only for the duration of a run; see `references/write-guard-rule.md`.
+
 **The hard blacklist — agents the runner must never interact with:**
 
 - Any agent whose `workingDirectory` is NOT under `~/agents/` — these are user-owned real agents (see explicit list below). Verify via `GET /api/agents?includeDeleted=false` before any interaction.

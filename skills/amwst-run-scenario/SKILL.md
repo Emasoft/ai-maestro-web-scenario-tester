@@ -25,6 +25,45 @@ You are the single-scenario dispatcher. The user names one or more scenarios; yo
 
 For unattended batch / range / `--improve` execution, use `amwst-run-scenarios-batch` instead — this skill is for explicitly-named one-off runs.
 
+## Write-guard sentinel (you OWN it — activate at start, deactivate at end)
+
+This plugin ships a PreToolUse **write-guard** hook (`hooks/hooks.json` →
+`scripts/amwst_subagent-write-guard.sh`) that stops scenario subagents from
+writing outside the project root / scratch. Because it is plugin-scoped it would
+otherwise fire in *every* session, so it is **SENTINEL-GATED**: it does nothing
+unless a run-sentinel file exists. **As the run owner, you create that sentinel
+at run START and delete it at run END** — that is what arms the guard for the
+duration of the run and disarms it afterward.
+
+Sentinel path (gitignored): `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json`
+
+- **At run START (before forking any `amwst-scenario-runner`):**
+  1. Ensure the consumer `.gitignore` ignores the sentinel (idempotent — append
+     the line `.claude/scenario_is_running.json` only if it is not already
+     present; never `git add -A`):
+     ```bash
+     GI="${CLAUDE_PROJECT_DIR}/.gitignore"
+     grep -qxF '.claude/scenario_is_running.json' "$GI" 2>/dev/null \
+       || printf '%s\n' '.claude/scenario_is_running.json' >> "$GI"
+     ```
+  2. Write the sentinel:
+     ```bash
+     mkdir -p "${CLAUDE_PROJECT_DIR}/.claude"
+     printf '{"scenario": "%s", "startedAt": "%s", "owner": "amwst-run-scenario"}\n' \
+       "$SCEN_ID" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+       > "${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json"
+     ```
+     (For several scenarios in one dispatch, one sentinel covers the whole
+     dispatch — set `scenario` to a comma-joined id list or `multiple`.)
+- **At run END (success, fail, OR abort/cleanup — ALWAYS):** delete it so the
+  guard is never left armed for ordinary work:
+  ```bash
+  rm -f "${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json"
+  ```
+  Make this the LAST thing you do even when a runner returns FAIL or you abort
+  early — a leftover sentinel keeps the write-guard active for every later
+  (non-scenario) session in this project.
+
 ## Prerequisites
 
 - Scenario files at `${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-NNN_*.scen.md` (the scenarios folder is configurable via `scenarios.config.json` `scenariosDir`; default `tests/scenarios/`; scenario files always carry the `.scen.md` extension)
@@ -53,8 +92,10 @@ Copy this checklist and track your progress:
 - [ ] Parse `$ARGUMENTS` into a list of scenario identifiers (numbers and/or names)
 - [ ] Resolve each identifier to its `.scen.md` file via glob; report any that don't resolve
 - [ ] Resolve the canonical rules-file path (consumer override else bundled)
+- [ ] **Activate the write-guard:** ensure `.gitignore` ignores the sentinel, then write `.claude/scenario_is_running.json`
 - [ ] Fork `amwst-scenario-runner` once per scenario (parallel for multiple) via the Agent tool
 - [ ] Collect each runner's 2-line summary
+- [ ] **Deactivate the write-guard:** delete `.claude/scenario_is_running.json` (always — even on FAIL/abort)
 - [ ] Return the per-scenario summaries to the user (do NOT paste report bodies)
 
 ### Workflow
@@ -62,9 +103,11 @@ Copy this checklist and track your progress:
 1. Parse `$ARGUMENTS` into a list of scenario identifiers (numbers like `16`, padded IDs like `SCEN-016`, or names like "maintainer").
 2. Resolve each identifier to its scenario file via glob. If an identifier does not resolve, report it and skip that one (do not abort the others).
 3. Resolve the rules-file path: prefer `${CLAUDE_PROJECT_DIR}/tests/scenarios/SCENARIOS_TESTS_RULES.md` if it exists, else `${CLAUDE_PLUGIN_ROOT}/references/SCENARIOS_TESTS_RULES.md`.
-4. For EACH resolved scenario, spawn an `amwst-scenario-runner` agent via the Agent tool (see spawn template below). When there is more than one scenario, issue all the Agent calls in the SAME turn so they run in parallel.
-5. Collect the 2-line summary each runner returns.
-6. Return the per-scenario summaries to the user. Do not paste report content, step tables, or screenshots inline — just the summaries and the report paths.
+4. **Activate the write-guard (run START):** ensure the sentinel is gitignored, then write `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json` (see "Write-guard sentinel" above). This ARMS the plugin's sentinel-gated write-guard for the whole run.
+5. For EACH resolved scenario, spawn an `amwst-scenario-runner` agent via the Agent tool (see spawn template below). When there is more than one scenario, issue all the Agent calls in the SAME turn so they run in parallel.
+6. Collect the 2-line summary each runner returns.
+7. **Deactivate the write-guard (run END):** delete `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json`. Do this ALWAYS — after success, after FAIL, and on any early abort/error path — so the guard is never left armed for ordinary work.
+8. Return the per-scenario summaries to the user. Do not paste report content, step tables, or screenshots inline — just the summaries and the report paths.
 
 ### Rules reference
 

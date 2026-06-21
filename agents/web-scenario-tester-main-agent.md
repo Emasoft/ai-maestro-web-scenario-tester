@@ -120,6 +120,21 @@ timestamped filename. `amwst-scenarios-rules` gives the exact path convention an
 how to resolve the main root from a worktree. Do not return report bodies in
 chat — write to disk and reference the path.
 
+## Write-guard sentinel (the run owner arms/disarms it)
+
+This plugin ships a PreToolUse **write-guard** hook (`hooks/hooks.json` →
+`scripts/amwst_subagent-write-guard.sh`) that confines scenario subagents to the
+project root / scratch — closing the `isolation: worktree` process-escape gap.
+Because a plugin hook loads in every session, the guard is **SENTINEL-GATED**:
+it is inert unless `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json`
+exists. The **run owner owns that sentinel** — the `amwst-run-scenario` /
+`amwst-run-scenarios-batch` skill **creates it at run start and deletes it at
+run end** (the batch spans the sentinel across the whole batch; for autonomous
+batches `master-cleanup.sh` deletes it first). The sentinel is gitignored. You
+do not wire the guard per-agent (plugin agents cannot carry a `hooks:` field) —
+the plugin hook + the sentinel are the whole mechanism. See
+`references/write-guard-rule.md`.
+
 ## Communication (MEMBER governance graph)
 
 You hold the **MEMBER** title. Your only outbound governance edge is to your

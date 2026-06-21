@@ -14,8 +14,10 @@
 #      ${CLAUDE_PLUGIN_ROOT}/scripts/.
 #   5. Write a starter scenarios.config.json from the template (only if absent).
 #   6. Stub a project helpers script from the template (only if absent).
-#   7. Install the write-guard from the template into .claude/scripts/ and
-#      print how to wire the project-scoped agent shadow.
+#   7. Ensure the consumer .gitignore ignores the write-guard's run sentinel
+#      (.claude/scenario_is_running.json). The write-guard itself ships WITH the
+#      plugin (hooks/hooks.json -> scripts/amwst_subagent-write-guard.sh) and is
+#      sentinel-gated, so there is NOTHING to install into the consumer here.
 #
 # Usage:
 #   sh init-scenarios-folder.sh                 # copy engine scripts (default)
@@ -84,8 +86,7 @@ for d in \
     "$SCEN_DIR/scripts" \
     "$SCEN_DIR/scripts/dev-browser-helpers" \
     "$PROJECT_DIR/reports/scenarios-runner" \
-    "$PROJECT_DIR/.claude/scripts" \
-    "$PROJECT_DIR/.claude/agents" ; do
+    "$PROJECT_DIR/.claude" ; do
     if [ ! -d "$d" ]; then
         mkdir -p "$d"
         echo "[init-scenarios]   + $d"
@@ -160,53 +161,47 @@ else
     echo "[init-scenarios]   = dev-browser-helpers/project-helpers.sh kept"
 fi
 
-# ---- Step 7: write-guard into .claude/scripts/ (always refresh the engine) ----
-GUARD_SRC="$PLUGIN_SCRIPTS/amwst_subagent-write-guard.sh.template"
-GUARD_DST="$PROJECT_DIR/.claude/scripts/subagent-write-guard.sh"
-echo "[init-scenarios] installing write-guard"
-if [ -f "$GUARD_SRC" ]; then
-    cp "$GUARD_SRC" "$GUARD_DST"
-    chmod +x "$GUARD_DST" 2>/dev/null || true
-    echo "[init-scenarios]   = .claude/scripts/subagent-write-guard.sh"
+# ---- Step 7: gitignore the write-guard run sentinel (idempotent) ----
+# The write-guard is shipped BY THE PLUGIN (hooks/hooks.json wires it as a
+# plugin-scoped PreToolUse hook -> scripts/amwst_subagent-write-guard.sh). It is
+# SENTINEL-GATED: inert unless ${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json
+# exists, which the run owner (the amwst-run-scenario / amwst-run-scenarios-batch
+# skills) creates at run start and deletes at run end. Nothing to install into
+# the consumer — we only make sure that runtime sentinel is gitignored.
+echo "[init-scenarios] ensuring write-guard run sentinel is gitignored"
+GITIGNORE="$PROJECT_DIR/.gitignore"
+SENTINEL_IGNORE_LINE=".claude/scenario_is_running.json"
+if [ -f "$GITIGNORE" ] && grep -qxF "$SENTINEL_IGNORE_LINE" "$GITIGNORE" 2>/dev/null; then
+    echo "[init-scenarios]   = .gitignore already ignores $SENTINEL_IGNORE_LINE"
 else
-    echo "[init-scenarios]   WARN: write-guard template missing in plugin scripts/" >&2
+    # Append a trailing newline first if the file exists and lacks one, so the
+    # new entry never glues onto the last line.
+    if [ -f "$GITIGNORE" ] && [ -n "$(tail -c 1 "$GITIGNORE" 2>/dev/null)" ]; then
+        printf '\n' >> "$GITIGNORE"
+    fi
+    printf '%s\n' "$SENTINEL_IGNORE_LINE" >> "$GITIGNORE"
+    echo "[init-scenarios]   + .gitignore <- $SENTINEL_IGNORE_LINE"
 fi
+
+# NOTE: scenario .scen.md files are PROJECT-SCOPED artifacts and MUST stay
+# git-tracked — this script never gitignores them.
 
 cat <<'WIRING'
 
 ────────────────────────────────────────────────────────────────────────────
-NEXT STEPS — wire the write-guard (IRON rule, see references/write-guard-rule.md)
+NEXT STEPS — configure your project
 ────────────────────────────────────────────────────────────────────────────
-Plugin-shipped agents CANNOT carry a `hooks:` field, so you MUST create
-PROJECT-SCOPED agent shadows that reference the installed write-guard:
+The write-guard needs NO wiring: the plugin's hooks/hooks.json already provides
+it as a sentinel-gated PreToolUse hook (it is inert outside an active scenario
+run; the run owner toggles it via .claude/scenario_is_running.json). See
+references/write-guard-rule.md.
 
-  1. Create .claude/agents/scenario-runner.md and
-     .claude/agents/scenario-improvement-implementer.md, each with
-     frontmatter:
-
-       ---
-       name: scenario-runner
-       description: Project shadow of amwst-scenario-runner with the write-guard hook.
-       isolation: worktree
-       hooks:
-         PreToolUse:
-           - matcher: "Write|Edit|MultiEdit|NotebookEdit|Bash"
-             hooks:
-               - type: command
-                 command: "${CLAUDE_PROJECT_DIR}/.claude/scripts/subagent-write-guard.sh"
-       ---
-       (body: "Follow the bundled amwst-scenario-runner behavior.")
-
-  2. Spawn these subagents by BARE name (scenario-runner) — never the
-     plugin-namespaced name, or the hook will NOT fire.
-
-THEN configure your project:
-  3. Edit tests/scenarios/scenarios.config.json
+  1. Edit tests/scenarios/scenarios.config.json
      (doc: references/scenarios.config.README.md).
-  4. Implement the 3 helpers in
+  2. Implement the 3 helpers in
      tests/scenarios/scripts/dev-browser-helpers/project-helpers.sh
      and point `helpersScript` in the config at it.
-  5. Author your first scenario with the create-scenario skill.
+  3. Author your first scenario with the create-scenario skill.
 ────────────────────────────────────────────────────────────────────────────
 WIRING
 

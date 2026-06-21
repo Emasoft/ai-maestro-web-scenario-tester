@@ -35,6 +35,16 @@ If the config file is present, run the `preflight_command` via Bash (single one-
 
 If no config file exists, skip preflight entirely. The per-scenario Phase 0 SAFE-SETUP in each scenario file is responsible for its own readiness checks.
 
+### Arm the write-guard (master-setup)
+
+After preflight passes and BEFORE the main loop, arm the plugin's
+sentinel-gated write-guard for the whole batch: ensure the consumer `.gitignore`
+ignores `.claude/scenario_is_running.json` (idempotent append), then write that
+sentinel (see the "Write-guard sentinel" section in the skill). It must exist
+for the entire main loop so every runner subagent is confined to the project
+root / scratch; it is deleted in Step 4 / master-cleanup. If preflight FAILS and
+you abort the batch, do NOT leave a sentinel behind.
+
 ## Step 3 — Main loop
 
 For each scenario ID `N` in the parsed list, in numeric order:
@@ -72,6 +82,15 @@ After the loop completes, write an aggregated summary to `${CLAUDE_PROJECT_DIR}/
 - Aggregated P0 proposal count (parse each `scenario_proposed-improvements_NNN_*.md` header)
 - Open issues not covered by P0 proposals
 - Recommended-for-implementer section naming which scenarios produced P0 proposals worth implementing
+
+### Disarm the write-guard (master-cleanup)
+
+Once the main loop is done and the batch report is written, disarm the
+write-guard by deleting `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json`
+so it is not left armed for ordinary work. For autonomous Rule-13 batches the
+bundled `master-cleanup.sh` deletes it as its very first step — so if you route
+teardown through that script you are already covered. Otherwise delete it here,
+on every exit path.
 
 ## Step 5 — Optional improvement loop
 
