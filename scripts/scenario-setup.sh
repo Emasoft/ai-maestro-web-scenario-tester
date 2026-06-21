@@ -18,7 +18,12 @@ NNN="${1:?usage: scenario-setup.sh <NNN>}"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 cd "$PROJECT_DIR"
 
-SCEN_FILE=$(ls "tests/scenarios/SCEN-${NNN}_"*.scen.md 2>/dev/null | head -1)
+# Resolve the scenario file via a glob (SC2012: avoid parsing `ls`). nullglob
+# makes a no-match expand to nothing so the guard below fires cleanly.
+shopt -s nullglob
+_scen_matches=( "tests/scenarios/SCEN-${NNN}_"*.scen.md )
+shopt -u nullglob
+SCEN_FILE="${_scen_matches[0]:-}"
 [ -f "$SCEN_FILE" ] || { echo "SETUP_FAIL scenario file not found for SCEN-$NNN" >&2; exit 1; }
 
 command -v yq >/dev/null 2>&1 || { echo "SETUP_FAIL 'yq' not on PATH (required for frontmatter parsing)" >&2; exit 1; }
@@ -48,6 +53,36 @@ parse_list() {
   printf '%s' "$out"
 }
 
+# SAFE path expansion — replaces the former `eval echo "$path"` (RC-120 RCE).
+# Expands a leading `~`/`~/` and `${VAR}` / `$VAR` references WITHOUT ever
+# running the string as code. Tilde uses bash parameter expansion; variable
+# references are resolved one-at-a-time against the environment via indirect
+# expansion (`${!name}`), so only real env vars are substituted and command
+# substitution / arithmetic / globbing in the path can never execute.
+expand_path() {
+  local path="$1"
+  # Leading tilde → $HOME (only the very first char, like a shell would).
+  # shellcheck disable=SC2088  # the '~' here are LITERAL match-patterns on the
+  # input string (we are detecting a leading tilde to expand it ourselves), not
+  # an attempt to have the shell tilde-expand — expansion is done via $HOME below.
+  case "$path" in
+    '~')   path="$HOME" ;;
+    '~/'*) path="${HOME}/${path#'~/'}" ;;
+  esac
+  # Resolve ${VAR} and $VAR references with no eval. Loop until no more
+  # well-formed references remain (handles multiple/adjacent vars).
+  local out="" rest="$path" pre name val
+  while [[ "$rest" =~ \$\{?([A-Za-z_][A-Za-z0-9_]*)\}? ]]; do
+    name="${BASH_REMATCH[1]}"
+    pre="${rest%%"${BASH_REMATCH[0]}"*}"   # text before the match
+    val="${!name-}"                         # env value (empty if unset)
+    out+="${pre}${val}"
+    rest="${rest#*"${BASH_REMATCH[0]}"}"    # text after the match
+  done
+  out+="$rest"
+  printf '%s' "$out"
+}
+
 REWIPE=$(parse_list "rewipe-list")
 GITFIX=$(parse_list "git-fixtures")
 FOLDFIX=$(parse_list "dir-fixtures")
@@ -63,10 +98,10 @@ echo "SETUP_BEGIN SCEN-$NNN ts=$TS"
 if [ -n "$REWIPE" ]; then
   while IFS= read -r f; do
     [ -z "$f" ] && continue
-    f_exp=$(eval echo "$f")
+    f_exp=$(expand_path "$f")
     if [ -f "$f_exp" ]; then
       if [[ "$f_exp" == "$HOME"* ]]; then
-        rel="HOME${f_exp#$HOME}"
+        rel="HOME${f_exp#"$HOME"}"
       else
         rel="ROOT${f_exp}"
       fi
@@ -108,7 +143,7 @@ if [ -n "$FOLDFIX" ]; then
   idx=0
   while IFS= read -r p; do
     [ -z "$p" ] && continue
-    p_exp=$(eval echo "$p")
+    p_exp=$(expand_path "$p")
     if [ ! -d "$p_exp" ]; then
       echo "SETUP_FAIL dir-fixture[$idx] $p_exp missing — scenario author must prepare fixture in advance" >&2
       exit 1

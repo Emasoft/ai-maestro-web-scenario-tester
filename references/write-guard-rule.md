@@ -11,7 +11,7 @@ keeps the run-sentinel gitignored (done for you by `init-scenarios-folder.sh`).
 Every scenario subagent that does code modification can only WRITE inside:
 
 1. **Its own project root or git worktree** — `$CLAUDE_PROJECT_DIR`
-2. **System scratch** — `/tmp`, `/private/tmp`, `/var/folders` (for cloning/fixing auxiliary repos)
+2. **System scratch** — `/tmp`, `/private/tmp`, `/var/folders/*` (for cloning/fixing auxiliary repos)
 3. **Any extra roots** the project explicitly lists in `scenarios.config.json` → `writeGuardAllowlist`
 
 Reads may go anywhere. Writes are restricted to the roots above. No exceptions.
@@ -144,21 +144,29 @@ You can exercise the guard by hand. With a sentinel present it should BLOCK an
 out-of-root write and ALLOW an in-root one; with the sentinel absent it should
 no-op (the gate). Example:
 
+Set `GUARD` to the guard script path and `PROJ` to the project root, then
+pass `PROJ` to the guard as a per-command inline variable assignment (the
+guard reads the project root from its own `CLAUDE_PROJECT_DIR` parameter — a
+scoped, per-invocation value, never a global shell export):
+
 ```bash
 GUARD="$CLAUDE_PLUGIN_ROOT/scripts/amwst_subagent-write-guard.sh"
-export CLAUDE_PROJECT_DIR="$(pwd)"
+PROJ="$(pwd)"
 
 # Gate OFF (no sentinel) → always exit 0, even for an outside path
-printf '{"tool_name":"Write","tool_input":{"file_path":"/etc/passwd"}}' | "$GUARD"; echo "no-sentinel exit=$?"   # 0
+printf '{"tool_name":"Write","tool_input":{"file_path":"/etc/passwd"}}' \
+  | CLAUDE_PROJECT_DIR="$PROJ" "$GUARD"; echo "no-sentinel exit=$?"   # 0
 
 # Gate ON → arm it
-mkdir -p "$CLAUDE_PROJECT_DIR/.claude"
-printf '{"scenario":"selftest","owner":"manual"}' > "$CLAUDE_PROJECT_DIR/.claude/scenario_is_running.json"
-printf '{"tool_name":"Write","tool_input":{"file_path":"/etc/passwd"}}' | "$GUARD"; echo "outside exit=$?"      # 2 (BLOCK)
-printf '{"tool_name":"Write","tool_input":{"file_path":"'"$CLAUDE_PROJECT_DIR"'/x.txt"}}' | "$GUARD"; echo "inside exit=$?"  # 0 (ALLOW)
+mkdir -p "$PROJ/.claude"
+printf '{"scenario":"selftest","owner":"manual"}' > "$PROJ/.claude/scenario_is_running.json"
+printf '{"tool_name":"Write","tool_input":{"file_path":"/etc/passwd"}}' \
+  | CLAUDE_PROJECT_DIR="$PROJ" "$GUARD"; echo "outside exit=$?"      # 2 (BLOCK)
+printf '{"tool_name":"Write","tool_input":{"file_path":"'"$PROJ"'/x.txt"}}' \
+  | CLAUDE_PROJECT_DIR="$PROJ" "$GUARD"; echo "inside exit=$?"  # 0 (ALLOW)
 
 # Disarm
-rm -f "$CLAUDE_PROJECT_DIR/.claude/scenario_is_running.json"
+rm -f "$PROJ/.claude/scenario_is_running.json"
 ```
 
 ## Checklist when running a code-modifying scenario subagent

@@ -3,3 +3,6 @@
 .DS_Store
 node_modules/
 .venv/
+# Sentinel that arms the plugin's PreToolUse write-guard during a scenario run
+# (the run owner writes it at run start, deletes it at run end). Never committed.
+.claude/scenario_is_running.json

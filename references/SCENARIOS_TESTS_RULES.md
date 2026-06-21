@@ -239,7 +239,7 @@ The scenario report (`reports/scenarios-runner/<scenario-name>_<timestamp>.repor
 **NEVER bypass the UI** to achieve a step's goal. All interactions must go through the browser:
 
 - Click buttons, fill forms, select options — via `dev-browser` per Rule 8. Legacy chrome-devtools-mcp support is deprecated.
-- Do NOT call API endpoints directly with `curl` (except for state verification AFTER a UI action)
+- Do NOT call API endpoints directly with a command-line HTTP client (except for read-only state verification AFTER a UI action)
 - Do NOT modify settings files directly
 - Do NOT run CLI commands to achieve what the UI should do
 
@@ -812,7 +812,7 @@ v3.6.0 the strict routes are:
 When a NEW strict route is added to `security-registry.json`, update
 this table AND every scenario that touches that route.
 
-### Sudo modal recognition pattern (dev-browser + legacy chrome-devtools-mcp)
+### Recognizing the sudo modal (dev-browser + legacy chrome-devtools-mcp)
 
 The same DOM structure is used in both automation stacks — the modal has
 `role="dialog"` and `aria-modal="true"`, so it is reliably locatable via
@@ -842,7 +842,7 @@ wait_for               → modal disappears
 
 If a scenario performs multiple strict operations in a row, only the
 FIRST one triggers the modal — subsequent operations within 60 seconds
-of the previous sudo-token acquisition re-prompt because sudo tokens are
+of the previous sudo-token acquisition re-prompt because sudo-tokens are
 **one-shot**. Each strict operation needs its own fresh token. If you
 batch 10 deletes in a cleanup phase, expect to see 10 modals. This is
 by design (sudo-mode rejects replayed tokens) and the scenario should
@@ -1149,7 +1149,7 @@ worktrees should be minimal. Implementation is fast.
 | Time (UTC) | Active account | Recovery delay | Cron fires queued |
 |---|---|---|---|
 | 2026-04-15T14:23 | emanuele | 8 min | 3 |
-...
+| … | … | … | … |
 ```
 
 This file is what the user reads when they wake up. One file, every proposal in priority order, with approve checkboxes. No hunting through 22 separate proposal files.

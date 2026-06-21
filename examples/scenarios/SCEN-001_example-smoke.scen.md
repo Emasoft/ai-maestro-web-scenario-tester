@@ -34,6 +34,12 @@ governance_password: "n/a — generic web app, no governance"
 commit: TBD
 author: web-scenario-tester examples
 ---
+<!-- markdownlint-configure-file { "MD001": false } -->
+<!-- The .scen.md DSL intentionally nests step headings (#### S<NNN>) directly
+     under phase headings (## Phase N) per the mandated format in
+     SCENARIOS_TESTS_RULES.md (phases use ##, steps use ####). That fixed
+     two-level jump is the contract, not a heading-increment mistake, so MD001
+     is disabled for this DSL file only — no other rule is relaxed. -->
 
 # Scenario: Example smoke test — homepage loads and primary navigation works
 

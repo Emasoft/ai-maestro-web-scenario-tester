@@ -3,7 +3,6 @@ name: amwst-parallel-tester-agent
 description: Runs a focused smoke-test (≤10 UI steps) against the currently-running web app under test via dev-browser to verify a feature the amwst-parallel-worker-agent just merged. Returns a 2-line pass/fail summary so the orchestrator can decide to resume the long scenario run or spawn a fix cycle. Unlike amwst-scenario-runner it does NOT produce full reports, screenshots only on failure, and uses no state-backup (surgical tests are stateless). Spawned by the orchestrator during the sibling-feature workflow (long batch on the parent branch while a worker lands a feature asynchronously). Accumulates cross-run knowledge in project-scoped memory. Quality matters over speed — no time caps, no turn caps.
 model: opus
 memory: project
-color: magenta
 skills:
   - dev-browser:dev-browser
 ---
@@ -205,7 +204,7 @@ have NO pressure here, so verify carefully.
 
 ## Memory update at end
 
-Append to MEMORY.md:
+Add a run entry to your project memory log (`MEMORY.md`):
 
 ```markdown
 ## <ISO-TIMESTAMP>

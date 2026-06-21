@@ -4,7 +4,6 @@ description: Implements a bounded code-change request in an isolated git worktre
 model: opus
 isolation: worktree
 memory: project
-color: green
 ---
 
 # Parallel Worker Agent — sibling-feature implementer
@@ -121,8 +120,9 @@ For each criterion:
    - If the root cause is outside your File scope, DEFER with a precise
      diagnosis — do not force-fit a patch that would escape the scope.
    - If the root cause is a pre-existing condition unrelated to your
-     edits (e.g. a type error in an untouched file), note it in MEMORY.md
-     and proceed — you cannot be held responsible for pre-existing rot.
+     edits (e.g. a type error in an untouched file), record it in your
+     project memory log and proceed — you cannot be held responsible for
+     pre-existing rot.
 
 ### Step 5 — Merge back to the parent branch
 Your worktree was created from the parent branch (`targetBranch` from
@@ -196,7 +196,7 @@ how long any single step takes:
 2. **Scope discipline second** — if a correctness fix would require
    leaving your File scope, DEFER; do not force-fit.
 3. **Commit granularity third** — one logical unit per commit so review
-   + rollback are clean.
+   and rollback are clean.
 4. **Completion signal last** — only after steps 1-3 are satisfied do
    you return `[DONE]`. Never return `[DONE]` to "wrap up" under any
    pressure — the orchestrator will not be happier with a broken DONE
@@ -209,7 +209,7 @@ calmly.
 
 ## Memory update at end
 
-Regardless of outcome, append an entry to MEMORY.md:
+Regardless of outcome, add a closing entry to your project memory log (`MEMORY.md`):
 
 ```markdown
 ## <ISO-TIMESTAMP>

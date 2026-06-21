@@ -20,7 +20,7 @@
 #   Scenario subagents may only WRITE to:
 #     1. $CLAUDE_PROJECT_DIR — the project root (runner) or the subagent's
 #        git worktree (implementer, via isolation: worktree)
-#     2. System scratch — /tmp, /private/tmp, /var/folders
+#     2. System scratch — /tmp, /private/tmp, /var/folders/*
 #     3. Any extra roots listed in scenarios.config.json "writeGuardAllowlist"
 #   Reads are NOT restricted — subagents may read from anywhere.
 #
@@ -150,7 +150,7 @@ is_allowed_path() {
         "$PROJECT_ROOT_ABS"|"$PROJECT_ROOT_ABS"/*) return 0 ;;
     esac
 
-    # 2. Scratch areas (cross-platform: macOS /private/tmp + /var/folders, Linux /tmp)
+    # 2. Scratch areas (cross-platform: macOS /private/tmp + /var/folders/*, Linux /tmp)
     case "$abs" in
         /tmp|/tmp/*) return 0 ;;
         /private/tmp|/private/tmp/*) return 0 ;;
@@ -218,7 +218,7 @@ BLOCKED by scenarios write-guard
 
 Allowed write roots:
   - $PROJECT_ROOT_ABS (project root / worktree)
-  - /tmp, /private/tmp, /var/folders (system scratch)
+  - /tmp, /private/tmp, /var/folders/* (system scratch)
   - extra roots from scenarios.config.json "writeGuardAllowlist"
 
 Scenario subagents may READ from anywhere, but may only WRITE inside their

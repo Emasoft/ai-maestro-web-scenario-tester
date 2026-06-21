@@ -24,7 +24,7 @@ JSON cannot hold comments, so every key is documented here.
 | `healthEndpoint` | string | A URL that returns HTTP 200 when the app is up. Master setup probes it before starting a batch. Use a real endpoint your app exposes — NOT a non-existent `/api/health` (verify it returns 200). |
 | `governancePasswordRef` | string | A REFERENCE to the test login/sudo password — never the literal secret. Forms: `env:VAR_NAME` (read from environment), `file:/abs/path` (read first line of a file), or `keychain:service/account` if your helper supports it. Keeps the secret out of the git-tracked config. |
 | `helpersScript` | string | Path (relative to project root) to YOUR project's dev-browser helpers script — the consumer-supplied equivalent of the reference `project-helpers-template.sh`. It implements the 3 required helper functions (login, sudo/confirm-modal, CRUD) for your app's specific DOM. |
-| `writeGuardAllowlist` | array of strings | EXTRA absolute write-roots the subagent write-guard should permit, beyond the always-allowed `${CLAUDE_PROJECT_DIR}` + `/tmp` + `/private/tmp` + `/var/folders`. Leave `[]` unless scenarios legitimately write outside the project (e.g. a fixtures tree under `$HOME/…`). Each entry is matched as a prefix. |
+| `writeGuardAllowlist` | array of strings | EXTRA absolute write-roots the subagent write-guard should permit, beyond the always-allowed `${CLAUDE_PROJECT_DIR}` + `/tmp` + `/private/tmp` + `/var/folders/*`. Leave `[]` unless scenarios legitimately write outside the project (e.g. a fixtures tree under `$HOME/…`). Each entry is matched as a prefix. |
 | `typeCheckCommand` | string | Command the implementer runs to type-check after a code change (e.g. `npx tsc --noEmit`). Empty string `""` to skip type-checking. |
 | `buildCommand` | string | Command to build the project (e.g. `npm run build`). Empty `""` to skip. |
 | `testCommand` | string | Command to run the unit test suite (e.g. `npm test`). Empty `""` to skip. |
@@ -42,7 +42,7 @@ registry that scenario runs touch.
 
 | Key | Type | Meaning |
 |---|---|---|
-| `cleanupTmuxPattern` | string | An extended-regex (`grep -E`) matched against `tmux list-sessions` names. Matching sessions are killed during master cleanup. Example: `^(scen-|cos-scen-)`. Empty → skip the tmux sweep. |
+| `cleanupTmuxPattern` | string | An extended-regex (`grep -E`) matched against `tmux list-sessions` names. Matching sessions are killed during master cleanup. Example: `^(scen-\|cos-scen-)`. Empty → skip the tmux sweep. |
 | `registryScanPath` | string | Path to a JSON agent-registry file to scan for leftover test agents after a batch (read-only — it only LOGS lingering entries, never deletes). A leading `~/` is expanded. Empty → skip the registry scan. |
 | `testAgentPattern` | string | An extended-regex matched against each registry entry's `name`. Matching entries are reported as lingering test artifacts. Required together with `registryScanPath`. Empty → skip. |
 

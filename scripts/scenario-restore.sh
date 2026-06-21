@@ -14,7 +14,19 @@ NNN="${1:?usage: scenario-restore.sh <NNN>}"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 
 BACKUP_ROOT="$PROJECT_DIR/tests/scenarios/state-backups"
-BACKUP_DIR=$(ls -dt "$BACKUP_ROOT/SCEN-${NNN}_"* 2>/dev/null | head -1)
+# Pick the most-recent backup dir. The suffix is an ISO-basic UTC timestamp
+# (%Y%m%dT%H%M%SZ), so lexical order == chronological order — sort the glob
+# matches descending and take the first (SC2012: do not parse `ls`).
+shopt -s nullglob
+_backup_matches=( "$BACKUP_ROOT/SCEN-${NNN}_"* )
+shopt -u nullglob
+BACKUP_DIR=""
+if [ "${#_backup_matches[@]}" -gt 0 ]; then
+  _backup_sorted=()
+  while IFS= read -r _line; do _backup_sorted+=("$_line"); done \
+    < <(printf '%s\n' "${_backup_matches[@]}" | sort -r)
+  BACKUP_DIR="${_backup_sorted[0]}"
+fi
 if [ -z "${BACKUP_DIR:-}" ]; then
   echo "RESTORE_FAIL no backup directory found for SCEN-$NNN under $BACKUP_ROOT" >&2
   exit 1

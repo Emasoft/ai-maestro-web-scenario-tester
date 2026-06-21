@@ -4,7 +4,6 @@ description: Reads scenario_proposed-improvements_*.md files from reports/scenar
 model: opus
 isolation: worktree
 memory: project
-color: orange
 skills:
   - amwst-scenarios-rules
 ---

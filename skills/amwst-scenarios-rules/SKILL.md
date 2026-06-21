@@ -75,7 +75,7 @@ Preloaded skill — no direct output. Visible artifacts are the scenario report,
 **Example 1 — Rule 6 cleanup**:
 Input: runner needs to delete a test resource at end of scenario.
 Output: open the resource's UI → delete control → confirm (re-authenticate if Rule 12 prompts) → confirm again.
-Incorrect: `curl -X DELETE /api/...` — bypasses the production surface and any re-auth gate.
+Incorrect: issuing a direct DELETE request to the API from the command line — that bypasses the production surface and any re-auth gate.
 
 **Example 2 — Rule 10 screenshot path**:
 Input: step 14 of SCEN-009 at run time 2026-04-14T14:30:00Z.
@@ -84,7 +84,10 @@ Incorrect: `screenshots/SCEN-009/baseline.png` — no timestamp, wrong format, c
 
 ## Resources
 
-- [references/SCENARIOS_TESTS_RULES.md](references/SCENARIOS_TESTS_RULES.md) — the canonical rules doc, bundled at the plugin root (`${CLAUDE_PLUGIN_ROOT}/references/SCENARIOS_TESTS_RULES.md`). Full text with frontmatter format, device emulation presets, phase templates, directory structure, scenario file format, and the non-negotiable cleanup order. Contains all 14 rules:
+- [references/SCENARIOS_TESTS_RULES.md](references/SCENARIOS_TESTS_RULES.md) — a pointer to the canonical rules doc bundled at the plugin root (`${CLAUDE_PLUGIN_ROOT}/references/SCENARIOS_TESTS_RULES.md`).
+  - Where the canonical rules live
+  - Consumer override location
+- The canonical full-length doc at `${CLAUDE_PLUGIN_ROOT}/references/SCENARIOS_TESTS_RULES.md` carries the frontmatter format, device emulation presets, phase templates, directory structure, scenario file format, and the non-negotiable cleanup order. It contains all 14 rules:
   - Rule 0: Who you are in a scenario (you are the human user, not an agent)
   - Rule 1: CLEAN-AFTER-YOURSELF
   - Rule 2: 0-IMPACT

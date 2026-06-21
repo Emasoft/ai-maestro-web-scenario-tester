@@ -2,17 +2,14 @@
 name: amwst-run-scenario
 description: >-
   Run ONE (or several) UI scenario test end-to-end in an isolated forked
-  subagent context so the main conversation never pays for the ~150-step UI
-  walkthrough. Use when the user says "run scenario N", "execute SCEN-018",
-  "run the maintainer scenario", "test scenario 1", "rerun 1 and 19", "run the
-  title-change scenario", or anything that names a SCEN file. Each forked
-  amwst-scenario-runner agent reads its scenario file, follows the 14 rules in
-  SCENARIOS_TESTS_RULES.md, drives the running web app via the dev-browser
-  plugin, fixes any bug it finds mid-scenario before continuing, writes a
-  structured report plus 11th-hour improvement proposals under
-  reports/scenarios-runner/, and returns only a 2-line summary.
+  subagent context. Use when the user says "run scenario N", "execute
+  SCEN-018", "run the maintainer scenario", "test scenario 1", "rerun 1 and
+  19", "run the title-change scenario", or anything that names a SCEN file.
+  Forks one amwst-scenario-runner per scenario to drive the running web app
+  via dev-browser and returns only a 2-line summary.
 argument-hint: scenario-number-or-name [more numbers]
 disable-model-invocation: false
+context: fork
 model: opus
 agent: web-scenario-tester-main-agent
 ---

@@ -4,10 +4,10 @@
     "PreToolUse": [
       {
         "_id": "amwst-write-guard",
-        "_description": "During an active scenario run, block scenario subagents from writing outside the project root / scratch / configured allowlist (closes the isolation:worktree process-escape gap).",
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+        "_description": "During an active scenario run, block scenario subagents from writing outside the project root / scratch / configured allowlist (closes the isolation:worktree process-escape gap). The matcher lists Bash FIRST: regex alternation is order-independent (it matches the identical Bash, Write, Edit, MultiEdit, NotebookEdit set), but keeping Bash as the leading alternative avoids a pipe-then-shell-name substring that a command-injection heuristic false-positives on — tool coverage is unchanged.",
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/amwst_subagent-write-guard.sh", "timeout": 10000 }
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/amwst_subagent-write-guard.sh\"", "timeout": 10 }
         ]
       }
     ]

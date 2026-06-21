@@ -1,9 +1,16 @@
 # Scenario Tests Rules — pointer
 
+## Table of Contents
+
+- [Where the canonical rules live](#where-the-canonical-rules-live)
+- [Consumer override location](#consumer-override-location)
+
+## Where the canonical rules live
+
 This skill does **not** carry its own copy of the rules doc. The canonical,
 full-length rules text is bundled once at the plugin root:
 
-```
+```text
 ${CLAUDE_PLUGIN_ROOT}/references/SCENARIOS_TESTS_RULES.md
 ```
 
@@ -11,9 +18,11 @@ Read that file for the complete 14-rule spec (Rule 0 + Rules 1-14), the
 scenario file format, the device-emulation presets, the phase/step templates,
 the autonomous-batch cron protocol, and the non-negotiable cleanup order.
 
+## Consumer override location
+
 A consuming project MAY override the canonical doc with its own copy at:
 
-```
+```text
 ${CLAUDE_PROJECT_DIR}/tests/scenarios/SCENARIOS_TESTS_RULES.md
 ```
 

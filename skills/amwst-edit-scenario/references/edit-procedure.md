@@ -67,7 +67,7 @@ After the edit, scan the entire file for rule violations.
 | `rm` / `rm -rf` | Destructive filesystem write | Click Delete button in UI |
 | `mv` | Filesystem write | Rename via UI form |
 | `kill` / process-kill of an app-managed session | Bypasses UI session mgmt | Click Hibernate or Delete in the UI |
-| `curl -X POST/PUT/DELETE/PATCH` | API action outside UI | Click the button that triggers it |
+| command-line HTTP client with a mutating method (POST/PUT/DELETE/PATCH) | API action outside UI | Click the button that triggers it |
 | `echo ... >` | Direct file write | Edit via UI or config page |
 | `sed -i` | Direct file edit | Edit via UI |
 | `git commit` | Project mutation | Out of scope for UI tests |

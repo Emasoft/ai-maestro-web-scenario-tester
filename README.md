@@ -52,7 +52,7 @@ to analyze an agent's conversation transcript (the JSONL log) after a run to
 understand what actually happened — cheaper and more capable than a Haiku
 subagent. It is **not** force-installed; nothing breaks without it.
 
-## Install
+## Installation
 
 ```bash
 # add the marketplace that hosts this plugin (and allows the dev-browser dep)
@@ -69,6 +69,23 @@ claude --agent web-scenario-tester-main-agent
 ```
 
 Requires Claude Code `>= 2.1.110`.
+
+## Usage
+
+Once installed, drive the harness in plain language — the main agent loads the
+matching skill (see [The 7 skills](#the-7-skills)) and does the work:
+
+```text
+"write a scenario for the checkout flow"   → authors a new .scen.md
+"run scenario 16"                          → runs SCEN-016 end-to-end
+"run 16, 18, 19"                           → runs them in parallel
+"run the overnight batch 1-24"             → unattended, rate-limit-resilient batch
+"implement the approved proposals"         → applies P0 fixes in a worktree
+```
+
+Scenario files live in the consuming project at `tests/scenarios/` (see
+[Per-project scenarios](#per-project-scenarios--scenariosconfigjson)); reports,
+proposals, and screenshots are written under `reports/scenarios-runner/`.
 
 ## The 7 skills
 
@@ -91,7 +108,7 @@ the consuming project at `tests/scenarios/` with the extension `.scen.md`
 (e.g. `tests/scenarios/SCEN-001_login.scen.md`). The plugin discovers them there
 and reads an optional config file:
 
-```
+```text
 ${CLAUDE_PROJECT_DIR}/tests/scenarios/scenarios.config.json
 ```
 
@@ -124,8 +141,8 @@ After that, drop your own `.scen.md` files in `tests/scenarios/` and run them.
 
 ## Authoring a `.scen.md` scenario
 
-A scenario is one markdown file with **YAML frontmatter** + numbered **phases**
-+ numbered **steps**. The fastest path is to ask the agent: *"write a scenario
+A scenario is one markdown file with **YAML frontmatter**, numbered **phases**,
+and numbered **steps**. The fastest path is to ask the agent: *"write a scenario
 for the checkout flow"* — it loads `amwst-create-scenario` and produces a
 compliant file. The full format (every frontmatter field, phase/step shape,
 cleanup order, screenshot + report conventions) lives in the `amwst-scenarios-rules`
@@ -165,16 +182,21 @@ prerequisites:
 ...
 ```
 
-## Write-guard (project-shadow install)
+## Write-guard (sentinel-gated, shipped with the plugin)
 
-Plugin-shipped agents **cannot** carry a `hooks:` field (a Claude Code security
-restriction). To constrain a code-modifying sub-agent so it can only write inside
-the project (and `/tmp`), install a **project-scoped shadow** of the agent under
-the consuming repo's `.claude/agents/` with a `PreToolUse` write-guard hook that
-points at a guard script in the repo's `.claude/scripts/`, and spawn the agent by
-its **bare name** so Claude resolves the project shadow (not the plugin copy).
-The bootstrap script can scaffold this shadow + guard for you. Without it,
-`isolation: worktree` gives filesystem isolation only — not process sandboxing.
+A code-modifying scenario sub-agent is confined to writing inside the project
+root (and `/tmp`) by a `PreToolUse` write-guard that **ships with the plugin** —
+`hooks/hooks.json` wires `scripts/amwst_subagent-write-guard.sh`. There is
+nothing to install in the consuming repo.
+
+Because a plugin hook loads in every session, the guard is **sentinel-gated**:
+it is inert unless `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json`
+exists. The run owner (the `amwst-run-scenario` / `amwst-run-scenarios-batch`
+skill) creates that sentinel at run start and deletes it at run end, so the
+guard is armed only for the duration of a run. The sentinel is gitignored
+(`init-scenarios-folder.sh` adds it). Without the guard, `isolation: worktree`
+gives filesystem isolation only — not process sandboxing. See
+[references/write-guard-rule.md](references/write-guard-rule.md).
 
 ## License
 
