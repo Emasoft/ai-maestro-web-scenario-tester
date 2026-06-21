@@ -1,0 +1,17 @@
+{
+  "scenariosDir": "tests/scenarios",
+  "browserInstance": "myapp-scenarios",
+  "dashboardUrl": "http://localhost:3000/",
+  "healthEndpoint": "http://localhost:3000/api/health",
+  "governancePasswordRef": "env:MYAPP_TEST_PASSWORD",
+  "helpersScript": "tests/scenarios/scripts/dev-browser-helpers/myapp-helpers.sh",
+  "writeGuardAllowlist": [],
+  "typeCheckCommand": "npx tsc --noEmit",
+  "buildCommand": "npm run build",
+  "testCommand": "npm test",
+  "restartCommand": "npm run dev",
+  "targetBranch": "main",
+  "cleanupTmuxPattern": "",
+  "registryScanPath": "",
+  "testAgentPattern": ""
+}

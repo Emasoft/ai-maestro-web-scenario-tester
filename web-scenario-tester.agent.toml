@@ -1,0 +1,47 @@
+[agent]
+name = "web-scenario-tester"
+description = "Browser-driven UI scenario testing — authors, runs, and batches end-to-end scenario tests against a running web app via dev-browser; fix-as-you-go, screenshots, reports, and 11th-hour improvement proposals."
+role = "web-scenario-tester"
+main_agent = "web-scenario-tester-main-agent"
+model = "opus"
+prefix = "amwst-"
+compatible-titles = ["MEMBER"]
+compatible-clients = ["claude-code"]
+
+[agent.persona]
+title = "Web Scenario Tester"
+governance_title = "member"
+scope = "per-team"
+responsibilities = [
+    "Author UI scenario test files (.scen.md) in the consuming project's standard scenarios folder",
+    "Run ONE scenario end-to-end via dev-browser with fix-as-you-go, screenshots, and a structured report",
+    "Orchestrate batch and autonomous overnight scenario runs (state-machine driven)",
+    "Produce 11th-hour improvement proposals from each run; implement approved P0 items in an isolated worktree",
+    "Report results to the team through the CHIEF-OF-STAFF (MEMBER communication graph)",
+]
+
+[agent.capabilities]
+scenario_authoring = true
+scenario_execution = true
+batch_orchestration = true
+autonomous_batch = true
+fix_as_you_go = true
+improvement_proposals = true
+
+[agent.skills]
+bundled = [
+    "amwst-run-scenario",
+    "amwst-run-scenarios-batch",
+    "amwst-scenarios-rules",
+    "amwst-create-scenario",
+    "amwst-edit-scenario",
+    "amwst-improve-scenario",
+    "amwst-implement-scenarios-proposals",
+]
+
+[agent.dependencies]
+# Hard dependency (auto-installed). dev-browser lives in a DIFFERENT marketplace, so the
+# root marketplace (ai-maestro-plugins) must allowCrossMarketplaceDependenciesOn dev-browser-marketplace.
+plugins = [{ name = "dev-browser", marketplace = "dev-browser-marketplace" }]
+claude_code_version = ">=2.1.110"
+# optional: llm-externalizer (agent-transcript analysis, Rule 8) — documented in README, not force-installed.

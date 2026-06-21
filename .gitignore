@@ -1,0 +1,5 @@
+/reports/
+/reports_dev/
+.DS_Store
+node_modules/
+.venv/
