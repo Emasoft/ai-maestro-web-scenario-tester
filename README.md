@@ -73,7 +73,7 @@ Requires Claude Code `>= 2.1.110`.
 ## Usage
 
 Once installed, drive the harness in plain language — the main agent loads the
-matching skill (see [The 7 skills](#the-7-skills)) and does the work:
+matching skill (see [The skills](#the-skills)) and does the work:
 
 ```text
 "write a scenario for the checkout flow"   → authors a new .scen.md
@@ -87,19 +87,55 @@ Scenario files live in the consuming project at `tests/scenarios/` (see
 [Per-project scenarios](#per-project-scenarios--scenariosconfigjson)); reports,
 proposals, and screenshots are written under `reports/scenarios-runner/`.
 
-## The 7 skills
+## The skills
 
 The main agent is a thin orchestrator — it loads the matching skill by name.
+Run-time skills load **on demand, one phase at a time**, so a long run stays
+token-cheap (see [Helper scripts](#helper-scripts) for the why).
 
 | Skill | What it does |
 |---|---|
-| `amwst-run-scenario` | Run ONE scenario end-to-end via dev-browser: drive the UI, verify each step, fix-as-you-go, screenshot per step, write a report + proposals. |
-| `amwst-run-scenarios-batch` | Run a range/list of scenarios; state-machine-driven so an unattended overnight batch survives rate limits; consolidates all proposals into one review file. |
+| `amwst-run-scenario` | Run ONE scenario end-to-end: fork the runner (drives the UI, verifies each step, fix-as-you-go, screenshot per step, writes the report), then fork the proposer (writes the 11th-hour proposals). |
+| `amwst-run-scenarios-batch` | Run a range/list; state-machine-driven so an unattended overnight batch survives rate limits; runs runner→proposer per scenario; consolidates every run's proposals into one review file. |
 | `amwst-scenarios-rules` | The canonical rules every scenario obeys — `.scen.md` format, phase/step shape, cleanup order, STATE-WIPE, screenshot + report conventions, the run lifecycle. The single source of truth the other skills build on. |
-| `amwst-create-scenario` | Author a new `.scen.md` scenario from a plain-language description of a user flow. |
-| `amwst-edit-scenario` | Edit / repair an existing scenario file (steps, frontmatter, fixtures). |
+| `amwst-create-scenario` | Author a new `.scen.md` scenario from a plain-language user flow, then validate it. |
+| `amwst-edit-scenario` | Edit / repair an existing scenario (steps, frontmatter, fixtures), then re-validate. |
+| `amwst-validate-scenario` | Validate a `.scen.md` (frontmatter + phases + strictly-increasing steps) before a run or commit. |
 | `amwst-improve-scenario` | Deepen an existing scenario after a run surfaced gaps or new edge cases. |
-| `amwst-implement-scenarios-proposals` | Implement the user-approved 11th-hour proposals produced by a batch, in an isolated git worktree. |
+| `amwst-implement-scenarios-proposals` | Implement the user-approved 11th-hour proposals from a batch, in an isolated git worktree. |
+| `amwst-phase-execute` | *(run-time)* The per-step execute loop — greppable one-step reads, scoped snapshots, region-capture + step-batch, clipped screenshots, sudo handling. The runner loads it when execution begins. |
+| `amwst-phase-fixasyougo` | *(run-time)* The fix loop — scoped diagnosis, the lean tool wrappers, fix→rebuild→retry. The runner loads it on a step failure. |
+| `amwst-phase-proposals` | *(run-time)* The 11th-hour analysis → P0-P3 proposals file. The proposer loads it. |
+| `amwst-region-capture` | *(helper)* Clipped, DOM/ARIA-scoped screenshots + scoped aria snapshots instead of full-page captures — token-cheap visual checks. |
+| `amwst-step-batch` | *(helper)* Run many deterministic UI steps in ONE dev-browser call, stopping at the first failed assertion. |
+
+## The agents (two-agent run flow)
+
+Each scenario is handled by **two forked agents in sequence**, so fix-as-you-go
+and proposal-analysis run in separate contexts (and the expensive run never drags
+a proposal-writing tail):
+
+| Agent | Role |
+|---|---|
+| `amwst-scenario-runner` | Runs ONE scenario end-to-end and writes ONLY the Rule 9 structured report. Returns `Report: <path>`. |
+| `amwst-scenario-proposer` | Runs AFTER the runner; reads that report + the scenario and writes the Rule 11 11th-hour proposals. Returns `Improvements: <path>`. |
+| `amwst-scenario-improvement-implementer` | Implements user-approved proposals in an isolated git worktree (the `--improve` flow). |
+
+## Helper scripts
+
+Bundled under `scripts/` (invoked as `${CLAUDE_PLUGIN_ROOT}/scripts/<name>`):
+
+| Script | What it does |
+|---|---|
+| `amwst-scenario-step.sh <scen.md> list\|phases\|S<NNN>` | Read ONE step (or the id / phase list) from a scenario — so a run never re-reads the whole `.scen.md` each turn. |
+| `amwst-leantool.py tsc\|eslint\|vitest\|pytest\|log <args>` | Run the tool and emit ERRORS ONLY (a count + one line per error), exit-code faithful; `log <file>` extracts just the error lines from a logfile. |
+| `amwst-validate-scenario.py <file.scen.md> [--strict]` | Validate a scenario's frontmatter + phase/step structure; non-zero exit on any error. |
+| `init-scenarios-folder.sh` | Bootstrap `tests/scenarios/` in a consumer project. |
+
+These exist to keep runs **token-cheap**: cost ≈ turns × per-turn-context, and the
+whole transcript is re-read every turn — so the harness reads one step at a time,
+filters tool output to errors only, and clips screenshots to the region under test
+rather than letting full pages and raw logs ride forward on every turn.
 
 ## Per-project scenarios + `scenarios.config.json`
 
@@ -181,6 +217,30 @@ prerequisites:
 ## Phase CLEANUP: Restore Original State
 ...
 ```
+
+## The 14 scenario rules
+
+Every run obeys 14 mandatory rules (full text:
+[`references/SCENARIOS_TESTS_RULES.md`](references/SCENARIOS_TESTS_RULES.md), also
+surfaced by the `amwst-scenarios-rules` skill):
+
+| # | Rule | In one line |
+|---|---|---|
+| 0 | WHO-YOU-ARE | You are the human USER of the app, never an in-app agent. |
+| 1 | CLEAN-AFTER-YOURSELF | The last phase restores the system to its pre-test state. |
+| 2 | 0-IMPACT | Never touch existing user resources; only test-prefixed ones. |
+| 3 | STATE-WIPE | Back up + restore the config files a run may perturb. |
+| 4 | FIX-AS-YOU-GO | Fix a real app bug at its root the moment a step fails, then retry. |
+| 5 | TRACK-AND-REPORT | Record every step, bug, and noticed issue in the report. |
+| 6 | STICK-TO-UI | Every mutation goes through the UI; one state-mutating bypass invalidates the run. |
+| 7 | SAFE-SETUP | Commit / build / health-check before the run starts. |
+| 8 | DEV-BROWSER | Drive the UI only via dev-browser (chrome-devtools MCP is deprecated). |
+| 9 | REPORT-FORMAT | The structured report has a fixed frontmatter + step-table shape. |
+| 10 | PHOTOSTORY | A screenshot per step in a timestamped per-run dir (auto-purged on a verified PASS). |
+| 11 | 11th-HOUR | After the run, produce concrete P0-P3 improvement proposals — the real product. |
+| 12 | SUDO-MODE | Re-enter the password on each destructive op that demands it. |
+| 13 | AUTONOMOUS-PROTOCOL | How an unattended overnight batch is structured (state machine + heartbeat). |
+| 14 | REPORTS-TO-PROJECT-ROOT | All reports / proposals / screenshots land under the main repo's `reports/`. |
 
 ## Write-guard (sentinel-gated, shipped with the plugin)
 
