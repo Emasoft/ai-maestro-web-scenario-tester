@@ -57,17 +57,51 @@ A single state-mutating UI bypass **invalidates the run** — restart from the
 first step. If the UI is broken at a step, that is a FIX-AS-YOU-GO trigger
 (repair it, then resume), never an excuse to bypass.
 
-## What you do — and which skill to load
+## Scenario tooling — which skill/script, when
+
+A run is **two agents, two contexts**: `amwst-scenario-runner` executes the
+scenario and writes ONLY the Rule 9 report; the SEPARATE `amwst-scenario-proposer`
+then reads that report and writes the 11th-HOUR proposals file. The runner never
+writes proposals; the proposer never drives the UI. Splitting them keeps each
+context small (fix-as-you-go and proposal-analysis no longer share one transcript).
+
+**Entry skills — load by name when the request arrives:**
 
 | The user wants… | Load this skill |
 |---|---|
-| Author a new `.scen.md` scenario from a description | **amwst-create-scenario** |
-| Run ONE scenario end-to-end | **amwst-run-scenario** |
-| Run a range/list of scenarios (incl. unattended overnight batch) | **amwst-run-scenarios-batch** |
-| The canonical rules every scenario obeys (format, phases, cleanup, reports) | **amwst-scenarios-rules** |
-| Edit / repair an existing scenario file | **amwst-edit-scenario** |
+| Author a new `.scen.md` scenario from a description | **amwst-create-scenario**, then validate it with **amwst-validate-scenario** |
+| Edit / repair an existing scenario file | **amwst-edit-scenario**, then re-validate with **amwst-validate-scenario** |
+| Validate a `.scen.md` before a run or commit | **amwst-validate-scenario** |
+| Run ONE scenario end-to-end | **amwst-run-scenario** (runs `amwst-scenario-runner`, THEN `amwst-scenario-proposer`) |
+| Run a range/list of scenarios (incl. unattended overnight batch) | **amwst-run-scenarios-batch** (each scenario runs the runner THEN the proposer) |
 | Deepen a scenario after a run surfaced gaps | **amwst-improve-scenario** |
 | Implement the approved 11th-hour proposals from a batch | **amwst-implement-scenarios-proposals** |
+| The canonical rules every scenario obeys (format, phases, cleanup, reports) | **amwst-scenarios-rules** |
+
+**Load-on-demand phase skills — loaded only when ENTERING that phase, never all
+upfront (token discipline):**
+
+| When | Skill (load via the Skill tool) | Used by |
+|---|---|---|
+| Entering the per-step execute loop | **amwst-phase-execute** | the runner |
+| A step fails on a real bug — entering the fix loop | **amwst-phase-fixasyougo** | the runner |
+| Analyzing a finished report into proposals | **amwst-phase-proposals** | the proposer |
+
+**Reference helpers — read their `references/*.js` by path when you need the
+technique (do NOT preload):**
+
+| Need | Skill |
+|---|---|
+| Clipped / region screenshots + scoped aria snapshots (never full-page) | **amwst-region-capture** |
+| Run many deterministic UI steps in ONE dev-browser call | **amwst-step-batch** |
+
+**Scripts — invoke as `${CLAUDE_PLUGIN_ROOT}/scripts/<name>`:**
+
+| Need | Script |
+|---|---|
+| Read ONE scenario step (or list/phases) greppably — never re-read the whole `.scen.md` | `amwst-scenario-step.sh <scen.md> list\|phases\|S<NNN>` |
+| Run a tool emitting ERRORS-ONLY, exit-code faithful | `amwst-leantool.py tsc\|eslint\|vitest\|pytest\|log <args>` |
+| Validate a scenario file (the script behind amwst-validate-scenario) | `amwst-validate-scenario.py <file.scen.md> [--strict]` |
 
 When in doubt about format, cleanup order, screenshot/report conventions, or the
 scenario lifecycle, **load `amwst-scenarios-rules` first** — it is the
@@ -107,8 +141,10 @@ These hold for every scenario you run; the skills spell out the mechanics.
 - **PHOTOSTORY.** Capture a screenshot at every meaningful step as proof; use
   the timestamped per-run directory + filename convention from
   `amwst-scenarios-rules`.
-- **Structured report + 11th-HOUR proposals.** Every run produces a report and a
-  separate improvement-proposals file. The proposals are the real product of the
+- **Structured report + 11th-HOUR proposals (TWO agents).** `amwst-scenario-runner`
+  drives the scenario and writes ONLY the report; the SEPARATE
+  `amwst-scenario-proposer` then reads that report and writes the
+  improvement-proposals file. The proposals are the real product of the
   exercise — concrete, actionable, prioritized.
 
 ## Token discipline — keep every run cheap (mandatory)
@@ -125,27 +161,31 @@ techniques hold for every run; the `amwst-scenario-runner` enforces them per ste
 1. **Minimize turns.** Drive a group of deterministic, known-outcome steps (a
    wizard page, a cleanup sequence) in ONE dev-browser call that stops at the
    first failed assertion — not one call per step (each call is a turn, and turns
-   are a linear cost multiplier). Break the turn only to read fresh UI state or to
-   diagnose a failure.
+   are a linear cost multiplier); use **amwst-step-batch** for the pattern. Break
+   the turn only to read fresh UI state or to diagnose a failure.
 2. **Control load order — fixed-first, volatile-last.** Read the inputs that never
    change (the rules, the scenario file, memory) ONCE upfront so they sit in the
    cached prefix; never re-read a fixed input mid-run (a re-read appends a second
    copy that rides forward every turn — recall it instead). Keep volatile
    observations (snapshots, screenshots, tool output) at the tail and DROP them
    after extracting the fact. The more often a thing changes, the later you read it.
-3. **Scoped source reads — never whole files.** To diagnose a bug, locate the
-   symbol (a structure/symbol search → file:line) then read ONLY that body with a
-   ranged read; a whole >300-line file read rides forward every turn. Do NOT load
-   an MCP server into the runner just for reads — its tool schemas cost ~80–120K
-   of base context re-read every turn, which defeats the goal; a plain CLI symbol
-   search + ranged read gives the same result at zero MCP cost.
+3. **Scoped source reads — never whole files.** To read a scenario step, use
+   `${CLAUDE_PLUGIN_ROOT}/scripts/amwst-scenario-step.sh <scen.md> S<NNN>` (or
+   `list`/`phases`) — never re-read the whole `.scen.md`. To diagnose a bug,
+   locate the symbol (a structure/symbol search → file:line) then read ONLY that
+   body with a ranged read; a whole >300-line file read rides forward every turn.
+   Do NOT load an MCP server into the runner just for reads — its tool schemas
+   cost ~80–120K of base context re-read every turn, which defeats the goal; a
+   plain CLI symbol search + ranged read gives the same result at zero MCP cost.
 4. **Errors-only test/lint/type-check output.** Never pipe raw `tsc` / `eslint` /
-   `vitest` / `pytest` / linter output into context — the passes, progress bars,
-   and banners ride forward every turn. Wrap each tool so it emits ONLY a count +
-   one line per real error (`file:line  CODE  msg`) and mirrors the tool's exit
-   code, never swallowing a real failure.
+   `vitest` / `pytest` / linter / log output into context — the passes, progress
+   bars, and banners ride forward every turn. Run each through
+   `${CLAUDE_PLUGIN_ROOT}/scripts/amwst-leantool.py tsc|eslint|vitest|pytest|log <args>`,
+   which emits ONLY a count + one line per real error (`file:line  CODE  msg`) and
+   mirrors the tool's exit code, never swallowing a real failure.
 5. **Screenshot discipline.** Take few screenshots, and capture the element's clip
-   box plus a small margin — never the whole page. For the rare genuinely-global
+   box plus a small margin — never the whole page; use **amwst-region-capture** for
+   clipped screenshots and scoped aria snapshots. For the rare genuinely-global
    overview, FIRST shrink the viewport to the smallest size that still shows the
    relationship you're checking, capture, then restore it.
 6. **dev-browser only — never read raw page text, CSS, or JS into context.** Drive

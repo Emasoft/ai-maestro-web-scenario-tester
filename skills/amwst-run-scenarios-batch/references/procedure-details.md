@@ -55,31 +55,41 @@ For each scenario ID `N` in the parsed list, in numeric order:
 
    **If the setup script fails (non-zero exit), the scenario MUST NOT start.** Log the failure in `batch-progress.log` as `SCENARIO_SETUP_FAIL <N> <reason>`, skip this scenario, and continue to the next one. The setup failure is a scenario-author problem (missing fixture, missing tag, bad path) — not something the batch conductor should paper over. Do NOT spawn the runner subagent when setup fails; it would just restart the scenario from step 1 in an uninitialized environment.
 
-3. **Spawn the `amwst-scenario-runner` subagent** via the Agent tool:
+3. **Spawn the `amwst-scenario-runner` subagent** via the Agent tool. The runner now writes ONLY the Rule 9 report — the 11th-HOUR proposals are written by the separate proposer subagent in the next sub-step:
    ```
    Agent(
        description: "Run SCEN-<padded-id> end-to-end",
        subagent_type: "amwst-scenario-runner",
-       prompt: "Run scenario number <N>. Scenario file: ${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-<padded-id>_*.scen.md. Rules file: <resolved-rules-path>. Follow rules 1-14, drive the app via the dev-browser CLI (Rule 8 — loaded via Skill(skill: 'dev-browser:dev-browser')), write the report + proposals under ${CLAUDE_PROJECT_DIR}/reports/scenarios-runner/, and return a 2-line summary."
+       prompt: "Run scenario number <N>. Scenario file: ${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-<padded-id>_*.scen.md. Rules file: <resolved-rules-path>. Follow rules 1-14, drive the app via the dev-browser CLI (Rule 8 — loaded via Skill(skill: 'dev-browser:dev-browser')), write ONLY the Rule 9 report under ${CLAUDE_PROJECT_DIR}/reports/scenarios-runner/, and return a 2-line summary ([PASS|FAIL|PARTIAL] SCEN-NNN — … + Report: <path>)."
    )
    ```
-   Wait for the subagent to return. Parse the 2-line result into pass/fail/partial + report path.
+   Wait for the subagent to return. Parse the 2-line result into pass/fail/partial + the Report path.
 
-4. **Per-scenario cleanup script (MANDATORY).** Run `${CLAUDE_PROJECT_DIR}/tests/scenarios/scripts/cleanup-SCEN-<padded-id>.sh` via Bash. This delegates to `scenario-restore.sh` which verifies and replays the MANIFEST.sha256. If it fails, log `SCENARIO_CLEANUP_FAIL <N> <reason>` in `batch-progress.log`, but continue to the next scenario (cleanup failures are noted for operator review, not fatal to the batch).
-
-5. **Append progress.** One line to `${CLAUDE_PROJECT_DIR}/tests/scenarios/state/batch-progress.log`:
+4. **Spawn the `amwst-scenario-proposer` subagent** via the Agent tool, AFTER the runner returns its Report path and BEFORE cleanup. It reads the runner's report + the scenario and writes the 11th-HOUR proposals file:
    ```
-   SCENARIO_DONE <padded-id> <pass|fail|partial> <report-path> <duration-seconds>
+   Agent(
+       description: "Propose improvements for SCEN-<padded-id>",
+       subagent_type: "amwst-scenario-proposer",
+       prompt: "Write the 11th-HOUR improvement proposals for scenario number <N>. Scenario file: ${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-<padded-id>_*.scen.md. Runner report: <Report-path-from-step-3>. Rules file: <resolved-rules-path>. Write the proposals under ${CLAUDE_PROJECT_DIR}/reports/scenarios-runner/scenario_proposed-improvements_<padded-id>_<timestamp>.md, and return a 2-line summary ([PROPOSALS] SCEN-NNN — N proposals (…) + Improvements: <path>)."
+   )
+   ```
+   Wait for the subagent to return. Parse the 2-line result for the Improvements (proposals) path. If the runner returned no Report path (it failed before writing one), skip the proposer for this scenario and note it in the progress log.
+
+5. **Per-scenario cleanup script (MANDATORY).** Run `${CLAUDE_PROJECT_DIR}/tests/scenarios/scripts/cleanup-SCEN-<padded-id>.sh` via Bash. This delegates to `scenario-restore.sh` which verifies and replays the MANIFEST.sha256. If it fails, log `SCENARIO_CLEANUP_FAIL <N> <reason>` in `batch-progress.log`, but continue to the next scenario (cleanup failures are noted for operator review, not fatal to the batch).
+
+6. **Append progress.** One line to `${CLAUDE_PROJECT_DIR}/tests/scenarios/state/batch-progress.log`:
+   ```
+   SCENARIO_DONE <padded-id> <pass|fail|partial> <report-path> <proposals-path> <duration-seconds>
    ```
 
-6. **Move to the next scenario.**
+7. **Move to the next scenario.**
 
 ## Step 4 — Aggregate the batch report
 
 After the loop completes, write an aggregated summary to `${CLAUDE_PROJECT_DIR}/reports/scenarios-runner/scenario-batch-<range>_<timestamp>.md` with:
 
-- Per-scenario result table (ID, status, bugs found, bugs fixed, duration, report path)
-- Aggregated P0 proposal count (parse each `scenario_proposed-improvements_NNN_*.md` header)
+- Per-scenario result table (ID, status, bugs found, bugs fixed, duration, report path, proposals path)
+- Aggregated P0 proposal count (parse each `scenario_proposed-improvements_NNN_*.md` produced by the `amwst-scenario-proposer` subagent)
 - Open issues not covered by P0 proposals
 - Recommended-for-implementer section naming which scenarios produced P0 proposals worth implementing
 

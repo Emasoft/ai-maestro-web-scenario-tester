@@ -64,7 +64,7 @@ Copy this checklist and track your progress:
 - [ ] Parse `$ARGUMENTS` into scenario IDs list and `improve` flag
 - [ ] Run optional preflight (config file + health probe)
 - [ ] **master-setup: ARM the write-guard** — gitignore + write `.claude/scenario_is_running.json`
-- [ ] For each scenario: check resume state → run setup script → spawn runner subagent → run cleanup script → log result
+- [ ] For each scenario: check resume state → run setup script → spawn runner subagent → spawn proposer subagent (reads the runner's report, writes the proposals file) → run cleanup script → log result
 - [ ] Aggregate batch report
 - [ ] If `--improve`: spawn implementer subagent for P0 proposals
 - [ ] **master-cleanup: DISARM the write-guard** — delete `.claude/scenario_is_running.json` (always; `master-cleanup.sh` does this for autonomous batches)
@@ -75,7 +75,7 @@ Copy this checklist and track your progress:
 1. Parse `$ARGUMENTS` into scenario IDs list and `improve` flag.
 2. Run optional preflight: read config file, probe health endpoint.
 3. **master-setup — ARM the write-guard:** ensure the sentinel is gitignored, then write `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json` (see "Write-guard sentinel" above). This guards every runner subagent for the whole batch.
-4. For each scenario: check resume state, run setup script, spawn runner subagent, run cleanup script, log result.
+4. For each scenario: check resume state, run setup script, spawn the `amwst-scenario-runner` subagent (it writes ONLY the Rule 9 report and returns its Report path), then spawn the `amwst-scenario-proposer` subagent (it reads that report + the scenario and writes the 11th-HOUR proposals file), run cleanup script, log result.
 5. Aggregate results into the batch report.
 6. If `--improve`: spawn the implementer subagent for P0 proposals.
 7. **master-cleanup — DISARM the write-guard:** delete `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json` (for autonomous batches `master-cleanup.sh` already does this first). Do it on every exit path — including an aborted batch after a failed preflight.
@@ -105,6 +105,8 @@ Improvements: <branch-name or "skipped">
 ```
 
 Where `P` = pass, `F` = fail, `X` = partial.
+
+Each scenario produces two files: the `amwst-scenario-runner` writes the Rule 9 report (`SCEN-NNN_<ts>.report.md`) and the `amwst-scenario-proposer` writes the 11th-HOUR proposals file (`scenario_proposed-improvements_NNN_<ts>.md`), both under `${CLAUDE_PROJECT_DIR}/reports/scenarios-runner/`.
 
 Aggregated batch report is saved under the project-root `reports/` directory (Rule 14):
 `${CLAUDE_PROJECT_DIR}/reports/scenarios-runner/scenario-batch-<range>_<timestamp>.md`

@@ -36,6 +36,7 @@ Copy this checklist and track your progress:
 - [ ] Enforce rules 1, 2, 6, 8, 10, 12, 14 on every Action field
 - [ ] Write file to `SCEN-<padded-id>_<slug>.scen.md`
 - [ ] Bump `NEXT_SCEN_NUMBER` to `NEXT_N + 1`
+- [ ] Validate the new file with `amwst-validate-scenario` and fix any reported errors before declaring done
 
 ### Workflow
 
@@ -47,6 +48,7 @@ Copy this checklist and track your progress:
 6. Enforce rules 1, 2, 6, 8, 10, 12, 14 on every Action field.
 7. Write the file to `${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-NNN_<slug>.scen.md`.
 8. Bump `NEXT_SCEN_NUMBER` to `NEXT_N + 1`.
+9. Validate the new file before declaring it done — run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amwst-validate-scenario.py" <file.scen.md>` (or invoke the `amwst-validate-scenario` skill). The validator checks the required frontmatter, the SAFE-SETUP/CLEANUP phases, and that every greppable `#### S<NNN>` block has **Action / Goal / Verify** (Creates/Modifies recommended; cleanup steps using **Removes:** are exempt). Fix every reported error and re-run until it exits clean.
 
 ### Rules reference
 

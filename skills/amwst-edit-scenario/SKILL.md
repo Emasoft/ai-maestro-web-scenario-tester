@@ -32,6 +32,7 @@ Copy this checklist and track your progress:
 - [ ] Apply the edit with the Edit tool
 - [ ] Re-validate rule compliance (Rules 1, 2, 6, 10, 12)
 - [ ] Bump `version:` if numbering or verifications changed
+- [ ] Re-validate the edited file with `amwst-validate-scenario` and fix any reported errors before finishing
 - [ ] Return 3-line summary
 
 ### Workflow
@@ -42,7 +43,8 @@ Copy this checklist and track your progress:
 4. Apply the edit with the Edit tool; preserve field ordering and blank lines.
 5. Re-validate: Rule 6 forbidden tokens, Rule 1 cleanup, Rule 2 naming, Rule 10 screenshot, Rule 12 sudo.
 6. Bump `version:` if numbering, verifications, or prerequisites changed.
-7. Return a 3-line summary.
+7. Re-validate the edited file before finishing — run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amwst-validate-scenario.py" <file.scen.md>` (or invoke the `amwst-validate-scenario` skill). Fix every reported error (frontmatter keys, SAFE-SETUP/CLEANUP phases, strictly-increasing `#### S<NNN>` steps each with Action/Goal/Verify) and re-run until it exits clean.
+8. Return a 3-line summary.
 
 ### Rules reference
 
