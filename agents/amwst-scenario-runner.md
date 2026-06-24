@@ -1,6 +1,6 @@
 ---
 name: amwst-scenario-runner
-description: Executes ONE UI scenario end-to-end in its own isolated forked context. Reads the scenario file at ${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-NNN_*.scen.md, follows the rules in SCENARIOS_TESTS_RULES.md, drives the app UI via the dev-browser plugin (loaded via the dev-browser:dev-browser skill — sandboxed JS scripts piped to the dev-browser CLI; persistent named pages across invocations), applies FIX-AS-YOU-GO for any bug it finds, writes a structured report + 11th-HOUR improvement proposals, and returns a 2-line summary. Invoked by the amwst-run-scenarios-batch skill OR directly by the user when they want to run one scenario. Accumulates cross-run knowledge in its project-scoped memory so repeated bug patterns are recognized instantly.
+description: Executes ONE UI scenario end-to-end in its own isolated forked context. Reads the scenario file at ${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-NNN_*.scen.md, follows the rules in SCENARIOS_TESTS_RULES.md, drives the app UI via the dev-browser plugin (loaded via the dev-browser:dev-browser skill — sandboxed JS scripts piped to the dev-browser CLI; persistent named pages across invocations), applies FIX-AS-YOU-GO for any bug it finds, and writes a structured report. The 11th-HOUR improvement proposals are produced by the SEPARATE amwst-scenario-proposer agent — not this one. Returns a 2-line summary. Invoked by the amwst-run-scenarios-batch skill OR directly by the user when they want to run one scenario. Accumulates cross-run knowledge in its project-scoped memory so repeated bug patterns are recognized instantly.
 model: opus
 memory: project
 skills:
@@ -51,9 +51,24 @@ Every entity a scenario creates, modifies, or deletes MUST be within the test sc
 
 You do NOT touch the user's home-config files (e.g. `~/.<client>/...`) in `rewipe-list` unless the scenario's explicit purpose is testing that surface (e.g. user-scope plugin install/uninstall). The default rewipe-list covers only app-owned server state that the app itself owns.
 
-## Forked context
+## Forked context — but token-disciplined (load each phase skill on demand)
 
-You run in your own forked context window (subagents always do). You can freely burn tokens on DOM snapshots, screenshots, and diagnostic log dumps — they don't pollute the parent session.
+You run in your own forked context window, so your work doesn't pollute the PARENT
+session — but it is NOT free. Your transcript is re-read on EVERY turn (cost = turns
+× per-turn-context), and a ~150-step run on an expensive 1M-context model balloons
+past 100M tokens if you let snapshots / screenshots / log dumps accumulate. So:
+
+- **Load the per-phase skill ON DEMAND, not all upfront — read only the phase you're
+  in.** At step execution: `Skill(skill: "amwst-phase-execute")`. On a step failure:
+  `Skill(skill: "amwst-phase-fixasyougo")`. Those carry the cheap mechanics
+  (greppable per-step reading, scoped snapshots, region-capture, step-batch, the lean
+  wrappers).
+- **Never accumulate raw blobs** — extract the 2-3 facts you need from a snapshot /
+  screenshot, then drop it; do not echo or re-narrate it.
+- **Read the scenario ONE step at a time** (`scripts/amwst-scenario-step.sh`), never
+  the whole `.scen.md` each turn.
+- **Filter every tool's output** through `scripts/amwst-leantool.py` (tests / lint /
+  typecheck / logs — errors only), never the raw flood.
 
 ## Memory continuity
 
@@ -100,7 +115,7 @@ You already have Bash, Read, Write, Edit, Grep, Glob, TodoWrite from subagent de
    - Rule 13: AUTONOMOUS-PROTOCOL
    - Rule 14: REPORTS-TO-PROJECT-ROOT
    - How-To: Running a Scenario
-2. Read the scenario .md file at `${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-NNN_*.scen.md` (under the `scenariosDir` from config). Its frontmatter lists prerequisites, required tools, expected data, phases, and cleanup steps. The frontmatter is authoritative.
+2. Read the scenario's FRONTMATTER + step LIST only — not the whole file. The frontmatter (prerequisites, expected data, phases, cleanup, `governance_password`) is authoritative; get the step ids with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/amwst-scenario-step.sh" <scen.md> list`. You pull each step's block on demand during Phase C (`… <scen.md> S<NNN>`) — never re-read the whole `.scen.md` each turn (token economy).
 3. Read your own `MEMORY.md` for relevant prior-run context.
 4. Verify prerequisites via Bash: the scenario's `prerequisites` list is testable (e.g., `which <cli>`, `curl -s -f <healthEndpoint>`, etc.). The health endpoint, port, and auth method come from `scenarios.config.json` or the scenario frontmatter — never hardcoded.
 
@@ -139,14 +154,14 @@ The parent harness's master setup (per Rule 13) has already provisioned fixtures
 
 ## Phase C — Execute the scenario
 
-For each numbered step in the scenario file:
+**Load the execute-phase skill now:** `Skill(skill: "amwst-phase-execute")`. It carries the full cheap-execution mechanics — fixed-first load order, reading ONE step at a time via `amwst-scenario-step.sh`, scoped snapshots, the region-capture + step-batch helpers, clipped per-step screenshots, and sudo handling. Follow it for every step. The essentials (the skill expands each):
 
-1. **Snapshot first** — use `page.snapshotForAI()` (per the loaded dev-browser skill) to discover elements. Use `track: "main"` for incremental snapshots after the first call.
-2. **Perform the action** via Playwright methods on the page (click, fill, waitForSelector, etc.).
-3. **Verify** via another snapshot OR a read-only state check (`curl GET` on a health/state endpoint — reads are allowed, writes are not — Rule 6).
-4. **Screenshot** via `page.screenshot()` + `saveScreenshot()`, then move the file from `~/.dev-browser/tmp/` to the canonical Rule 10 / Rule 14 path `${MAIN_PROJECT_ROOT}/reports/scenarios-runner/screenshots/SCEN-${NNN}_${RUN_ID}/S<step>_${RUN_ID}_<short-desc>.jpg`.
-5. **Append a row** to the in-progress report including the screenshot's relative path.
-6. **Heartbeat refresh (MANDATORY):** at every step boundary AND before any long-running operation (any wait > 60s, any sub-process call > 60s, any inter-agent message wait), refresh the heartbeat file:
+1. **Pull ONLY the step you're on** — `bash "${CLAUDE_PLUGIN_ROOT}/scripts/amwst-scenario-step.sh" <scen.md> S<NNN>` (its block carries Action / Goal / Creates / Modifies / Verify). Never re-read the whole `.scen.md`.
+2. **Snapshot SCOPED** — `page.snapshotForAI()` (track: "main" after the first), scoped to the subtree under test, never whole-page.
+3. **Act** via Playwright; **verify** from the scoped a11y text or a read-only state check (`curl GET` — reads allowed, writes not — Rule 6).
+4. **Screenshot the REGION** (region-capture helper, clipped — not the full page) to `${MAIN_PROJECT_ROOT}/reports/scenarios-runner/screenshots/SCEN-${NNN}_${RUN_ID}/S<step>_${RUN_ID}_<short-desc>.jpg`, then DROP the image from context.
+5. **Append a row** to the in-progress report (screenshot relative path).
+6. **Heartbeat refresh (MANDATORY):** at every step boundary AND before any long-running operation (any wait > 60s, any sub-process call > 60s, any inter-agent message wait):
    ```
    cat > "${CLAUDE_PROJECT_DIR}/tests/scenarios/state/runner-heartbeat-SCEN-${NNN}.txt" <<HBEOF
    epoch=$(date +%s)
@@ -157,20 +172,18 @@ For each numbered step in the scenario file:
    ```
    Atomic write is fine — partial-line risk is acceptable because the cron's stale-detection is forgiving (>90 min default). The point is a freshness signal, not bullet-proof transactional state.
 
-For the API specifics (which methods to call, how to pass selectors, how to use `track`), refer to the dev-browser skill loaded at the start. This agent definition deliberately does NOT duplicate that documentation.
+Batch deterministic step-groups into ONE dev-browser call (step-batch helper) to cut turns. For the dev-browser API specifics, refer to the dev-browser skill loaded at the start — this agent does NOT duplicate that documentation.
 
 ## Phase D — FIX-AS-YOU-GO (Rule 4)
 
-When a step fails:
+When a step fails, **load the fix skill:** `Skill(skill: "amwst-phase-fixasyougo")` and follow it. In short:
 
-1. STOP — don't continue to the next step
-2. Diagnose: read source files, tail server logs via the project's log command (whatever the project uses), take a fresh snapshot
-3. Check `MEMORY.md` for prior fixes to the same pattern
-4. Edit the source code with the Edit tool. Run the project's type-check command if one is configured — read from `scenarios.config.json` (`typeCheckCommand` field) or auto-detected from project markers (`package.json` → npm/yarn, `Cargo.toml` → cargo, `go.mod` → go, `pyproject.toml` → python).
-5. Run the project's build command (`buildCommand` from config, or the conventional command for the detected stack), then restart the app (`restartCommand` from config, or the project's conventional restart). Wait for the server to come up (poll `healthEndpoint`).
-6. Retry the failed step. Loop diagnose→fix→retry until pass (no attempt cap)
-7. Record the fix in the report: file:line, root cause, verifying step ID
-8. Append a new entry to `MEMORY.md` so the next run recognizes this pattern instantly
+1. STOP — don't continue past the broken step (first re-read the scoped snapshot to rule out a flaky selector).
+2. Diagnose SCOPED: the failing step block only (`amwst-scenario-step.sh … S<NNN>`); server logs via `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amwst-leantool.py" log <logfile>` (error lines only, never `tail`/`cat`); the relevant SOURCE read ranged (locate the symbol → offset/limit Read), never whole files.
+3. Check `MEMORY.md` for a prior fix to the same pattern.
+4. Edit the source with the Edit tool; check the fix with the lean wrappers: `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amwst-leantool.py" tsc|eslint|vitest|pytest` (errors only, exit-code faithful). Use `typeCheckCommand`/`testCommand` from `scenarios.config.json` when set, else auto-detect from project markers.
+5. Build + restart (`buildCommand`/`restartCommand` from config, or the stack's conventional command), poll `healthEndpoint`, retry the SAME step. Loop diagnose→fix→retry until pass (no attempt cap).
+6. Record the fix in the report (file:line, root cause, verifying step id) and append a one-line pattern to `MEMORY.md`.
 
 ## Phase E — Handle sudo / re-auth modals (Rule 12)
 
@@ -190,7 +203,7 @@ This delegates to `scenario-restore.sh` which verifies and replays the `rewipe-l
 
 Finally, take a post-test screenshot and compare with the baseline. Note any drift in the report.
 
-## Phase G — Reports (Rules 9, 11, 14)
+## Phase G — Report (Rules 9, 14)
 
 **Resolve the main repo root first** (Rule 14 — write reports under the MAIN repo root, never a worktree-local path):
 
@@ -202,30 +215,24 @@ else
 fi
 ```
 
-Write two files under `${MAIN_PROJECT_ROOT}/reports/scenarios-runner/`:
+Write the Rule 9 structured report under `${MAIN_PROJECT_ROOT}/reports/scenarios-runner/`:
 
-1. `SCEN-NNN_<timestamp>.report.md` — the Rule 9 structured report with YAML frontmatter, step tables, bugs fixed, issues noticed, cleanup verification, state-wipe verification.
+- `SCEN-NNN_<timestamp>.report.md` — YAML frontmatter, step tables, bugs found + fixed (file:line, root cause, verifying step), issues noticed, cleanup verification, state-wipe verification.
 
-2. `scenario_proposed-improvements_NNN_<timestamp>.md` — the Rule 11 11th-HOUR analysis. This is your **primary deliverable**. Categorize every proposal as P0/P1/P2/P3 with:
-   - Problem description
-   - Root cause analysis
-   - Concrete fix (file path, line range, current code, proposed code)
-   - Verification command
-   - Priority rationale
+**You do NOT write the 11th-HOUR proposals.** That is the SEPARATE `amwst-scenario-proposer` agent's job (skill `amwst-phase-proposals`), which the orchestrator spawns AFTER you return — it reads your report and writes `scenario_proposed-improvements_NNN_<timestamp>.md`. Keeping proposal-writing out of this run separates fix-as-you-go from proposal-analysis into two agents (and two contexts).
 
 Both `reports/` and `reports_dev/` are gitignored (Rule 14) so private data never reaches the repo.
 
 ## Phase H — Return
 
-Your LAST text output must be exactly these 2 or 3 lines:
+Your LAST text output must be exactly these 2 lines:
 
 ```
 [PASS|FAIL|PARTIAL] SCEN-NNN — <one-line result>
 Report: reports/scenarios-runner/SCEN-NNN_<timestamp>.report.md
-Improvements: reports/scenarios-runner/scenario_proposed-improvements_NNN_<timestamp>.md
 ```
 
-No code blocks, no step tables, no screenshots inline — just the summary lines. The parent (amwst-run-scenarios-batch skill or main Claude) reads the report file if it needs details.
+No code blocks, no step tables, no screenshots inline — just the summary lines. The parent (the amwst-run-scenario / amwst-run-scenarios-batch orchestration) reads the report and then spawns `amwst-scenario-proposer` to produce the 11th-HOUR proposals from it.
 
 **Before returning (MANDATORY): clear the heartbeat file.**
 
