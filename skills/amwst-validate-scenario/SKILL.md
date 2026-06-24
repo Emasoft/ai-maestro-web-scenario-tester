@@ -37,3 +37,8 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amwst-validate-scenario.py" <file.scen.md
 ## On findings
 Fix the scenario (via `amwst-edit-scenario`) and re-run until clean. Do NOT run a
 scenario the validator errors on.
+
+## Done when
+
+- [ ] The validator exits 0 (no errors) for the scenario file.
+- [ ] Any reported errors were fixed and the validator was re-run clean.

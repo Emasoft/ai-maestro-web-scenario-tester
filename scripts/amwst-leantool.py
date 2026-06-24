@@ -56,12 +56,15 @@ def parse_eslint(text):
         for m in f.get("messages", []):
             sev = m.get("severity")
             rule = m.get("ruleId") or "(core)"
-            line = m.get("line", "?"); col = m.get("column", "?")
+            line = m.get("line", "?")
+            col = m.get("column", "?")
             msg = (m.get("message") or "").strip()
             if sev == 2:
-                errs += 1; out.append(f"  {path}:{line}:{col}  {rule} {msg}")
+                errs += 1
+                out.append(f"  {path}:{line}:{col}  {rule} {msg}")
             elif sev == 1:
-                warns += 1; out.append(f"  {path}:{line}:{col}  [warn] {rule} {msg}")
+                warns += 1
+                out.append(f"  {path}:{line}:{col}  [warn] {rule} {msg}")
     return errs, warns, out
 
 def parse_vitest(text):
@@ -125,9 +128,11 @@ def _fallback(label, rc, stdout, stderr):
     seen = 0
     for ln in (stdout + "\n" + stderr).splitlines():
         if re.search(r"\berror\b|\bfailed\b|\bFAIL\b|Error:", ln, re.I):
-            print("  " + ln.strip()); seen += 1
+            print("  " + ln.strip())
+            seen += 1
             if seen >= 200:
-                print("  …(truncated at 200)"); break
+                print("  …(truncated at 200)")
+                break
     if seen == 0:
         print("  (no error-ish lines found in raw output)")
 
@@ -137,8 +142,8 @@ def cmd_tsc(args):
     try:
         n, lines = parse_tsc(text)
         print(f"TSC: {n} error{'' if n == 1 else 's'}")
-        for l in lines:
-            print(l)
+        for ln in lines:
+            print(ln)
     except Exception:
         _fallback("TSC", rc, out, err)
     return rc
@@ -149,8 +154,8 @@ def cmd_eslint(args):
     try:
         e, w, lines = parse_eslint(out)
         print(f"ESLINT: {e} error{'' if e == 1 else 's'}, {w} warning{'' if w == 1 else 's'}")
-        for l in lines:
-            print(l)
+        for ln in lines:
+            print(ln)
     except Exception:
         _fallback("ESLINT", rc, out, err)
     return rc
@@ -160,8 +165,8 @@ def cmd_vitest(args):
     try:
         f, p, lines = parse_vitest(out)
         print(f"VITEST: {f} failed / {p} passed")
-        for l in lines:
-            print(l)
+        for ln in lines:
+            print(ln)
     except Exception:
         _fallback("VITEST", rc, out, err)
     return rc
@@ -172,35 +177,43 @@ def cmd_pytest(args):
     try:
         f, p, lines = parse_pytest(text)
         print(f"PYTEST: {f} failed / {p} passed")
-        for l in lines:
-            print(l)
+        for ln in lines:
+            print(ln)
     except Exception:
         _fallback("PYTEST", rc, out, err)
     return rc
 
 def cmd_log(args):
     """Print ONLY the error/fail/exception lines of a log — never the whole file (L9, technique 7)."""
-    path = None; tail = 40; pattern = None; i = 0
+    path = None
+    tail = 40
+    pattern = None
+    i = 0
     while i < len(args):
         a = args[i]
         if a == "--tail" and i + 1 < len(args):
-            tail = int(args[i + 1]); i += 2
+            tail = int(args[i + 1])
+            i += 2
         elif a == "--pattern" and i + 1 < len(args):
-            pattern = args[i + 1]; i += 2
+            pattern = args[i + 1]
+            i += 2
         else:
-            path = a; i += 1
+            path = a
+            i += 1
     if not path:
-        print("usage: leantool.py log <path> [--tail N] [--pattern REGEX]"); return 2
+        print("usage: leantool.py log <path> [--tail N] [--pattern REGEX]")
+        return 2
     try:
         with open(path, "r", errors="replace") as fh:
             text = fh.read()
     except OSError as e:
-        print(f"LOG: cannot read {path}: {e}"); return 2
+        print(f"LOG: cannot read {path}: {e}")
+        return 2
     count, shown, omitted = parse_log(text, pattern, tail)
     suffix = f" (last {len(shown)}; {omitted} earlier matches omitted)" if omitted else ""
     print(f"LOG {path}: {count} matching line{'' if count == 1 else 's'}{suffix}")
-    for l in shown:
-        print("  " + l)
+    for ln in shown:
+        print("  " + ln)
     return 0  # extraction succeeded; the count line is the signal (a log is not a pass/fail gate)
 
 # ───────────────────────── selftest ─────────────────────────
@@ -214,7 +227,8 @@ def selftest():
         "Found 2 errors in 2 files.\n"
     )
     if n != 2 or "TS2322" not in lines[0] or "TS2304" not in lines[1]:
-        print("FAIL tsc parse:", n, lines); ok = False
+        print("FAIL tsc parse:", n, lines)
+        ok = False
 
     e, w, lines = parse_eslint(json.dumps([
         {"filePath": "app/page.tsx", "messages": [
@@ -224,7 +238,8 @@ def selftest():
         {"filePath": "lib/ok.ts", "messages": []},
     ]))
     if e != 1 or w != 1 or "no-unused-vars" not in lines[0]:
-        print("FAIL eslint parse:", e, w, lines); ok = False
+        print("FAIL eslint parse:", e, w, lines)
+        ok = False
 
     f, p, lines = parse_vitest(json.dumps({
         "numFailedTests": 1, "numPassedTests": 12,
@@ -234,7 +249,8 @@ def selftest():
         ]}],
     }))
     if f != 1 or p != 12 or "rejects empty token" not in lines[0]:
-        print("FAIL vitest parse:", f, p, lines); ok = False
+        print("FAIL vitest parse:", f, p, lines)
+        ok = False
 
     pf, pp, lines = parse_pytest(
         "FAILED tests/test_auth.py::test_rejects_empty_token - AssertionError: expected 401\n"
@@ -243,7 +259,8 @@ def selftest():
         "=== 1 failed, 1 error, 12 passed in 0.4s ===\n"
     )
     if pf < 2 or pp != 12 or "test_rejects_empty_token" not in lines[0]:
-        print("FAIL pytest parse:", pf, pp, lines); ok = False
+        print("FAIL pytest parse:", pf, pp, lines)
+        ok = False
 
     lc, lshown, lomit = parse_log(
         "INFO server started on :23000\n"
@@ -254,14 +271,16 @@ def selftest():
         tail=40,
     )
     if lc != 2 or lomit != 0 or "EADDRINUSE" not in lshown[0]:
-        print("FAIL log parse:", lc, lshown, lomit); ok = False
+        print("FAIL log parse:", lc, lshown, lomit)
+        ok = False
 
     print("SELFTEST: PASS" if ok else "SELFTEST: FAIL")
     return 0 if ok else 1
 
 def main():
     if len(sys.argv) < 2:
-        print(__doc__); return 2
+        print(__doc__)
+        return 2
     sub, rest = sys.argv[1], sys.argv[2:]
     if sub == "selftest":
         return selftest()

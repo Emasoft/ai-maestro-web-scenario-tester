@@ -1,0 +1,5 @@
+[project]
+name = "web-scenario-tester-scripts"
+version = "0.1.0"
+description = "Helper scripts for the web-scenario-tester plugin: scenario validation and lean tool-output wrappers (amwst-validate-scenario.py, amwst-leantool.py)."
+requires-python = ">=3.10"

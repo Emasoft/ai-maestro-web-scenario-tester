@@ -54,3 +54,9 @@ Then return to `amwst-phase-execute` and continue with the next step.
 The 11th-HOUR improvement PROPOSALS are written by a SEPARATE agent
 (`amwst-scenario-proposer`, skill `amwst-phase-proposals`) AFTER the run — never
 mix proposal-writing into this fix loop.
+
+## Done when
+
+- [ ] The previously failing step passes after the root-cause fix.
+- [ ] The fix is recorded (report `file:line` + verifying step id, and a one-line MEMORY pattern).
+- [ ] Execution resumes at the next step (back in `amwst-phase-execute`).

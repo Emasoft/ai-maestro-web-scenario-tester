@@ -57,7 +57,7 @@ A single state-mutating UI bypass **invalidates the run** — restart from the
 first step. If the UI is broken at a step, that is a FIX-AS-YOU-GO trigger
 (repair it, then resume), never an excuse to bypass.
 
-## Scenario tooling — which skill/script, when
+## Scenario tooling — when to use each skill and script
 
 A run is **two agents, two contexts**: `amwst-scenario-runner` executes the
 scenario and writes ONLY the Rule 9 report; the SEPARATE `amwst-scenario-proposer`

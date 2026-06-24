@@ -58,9 +58,14 @@ waitForSelector/waitForFunction`).
 - Capture the per-run screenshot for the group with the `captureRegion` helper
   (clipped), saved to disk, NOT returned in the batch log.
 - On a failure the log gives `{i, detail}`; THEN drop to single-step mode to diagnose
-  + FIX-AS-YOU-GO.
+  and FIX-AS-YOU-GO.
 
 ## Notes
 Confirm the dev-browser sandbox exposes `page.click/fill/press/goto/waitForSelector/
 waitForFunction/waitForTimeout` (core Playwright; expected present). Add a `sudo` step
 type if a password modal needs in-batch handling (otherwise break the turn for it).
+
+## Done when
+
+- [ ] The batch returns its compact log (every step `ok`), OR it stopped at the first failed assertion.
+- [ ] On a stop, you have identified which step `{i}` broke and its `detail`.

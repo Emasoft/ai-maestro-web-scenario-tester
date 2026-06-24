@@ -28,7 +28,7 @@ Follow it:
 3. Read your own `MEMORY.md` for patterns already proposed in prior runs (don't re-propose).
 4. Analyse: unfixed bugs, pre-existing interference, workflow inefficiencies, API/UX issues, coverage gaps.
 5. Write `${MAIN_PROJECT_ROOT}/reports/scenarios-runner/scenario_proposed-improvements_NNN_<ts>.md` — each proposal P0-P3 with Problem / Root cause / Proposed fix (file:line) / Verification / Risk. Concise + DRY.
-6. Append any durable new pattern to `MEMORY.md`.
+6. Record any durable new pattern in your own project memory.
 
 Resolve `${MAIN_PROJECT_ROOT}` per Rule 14: `MAIN_PROJECT_ROOT="$(git worktree list | head -n1 | awk '{print $1}')"` (the MAIN repo root, never a worktree-local path).
 

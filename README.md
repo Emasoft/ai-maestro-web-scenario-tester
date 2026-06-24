@@ -103,7 +103,7 @@ token-cheap (see [Helper scripts](#helper-scripts) for the why).
 | `amwst-validate-scenario` | Validate a `.scen.md` (frontmatter + phases + strictly-increasing steps) before a run or commit. |
 | `amwst-improve-scenario` | Deepen an existing scenario after a run surfaced gaps or new edge cases. |
 | `amwst-implement-scenarios-proposals` | Implement the user-approved 11th-hour proposals from a batch, in an isolated git worktree. |
-| `amwst-phase-execute` | *(run-time)* The per-step execute loop — greppable one-step reads, scoped snapshots, region-capture + step-batch, clipped screenshots, sudo handling. The runner loads it when execution begins. |
+| `amwst-phase-execute` | *(run-time)* The per-step execute loop — greppable one-step reads, scoped snapshots, region-capture + step-batch, clipped screenshots, re-auth (sudo) modal handling. The runner loads it when execution begins. |
 | `amwst-phase-fixasyougo` | *(run-time)* The fix loop — scoped diagnosis, the lean tool wrappers, fix→rebuild→retry. The runner loads it on a step failure. |
 | `amwst-phase-proposals` | *(run-time)* The 11th-hour analysis → P0-P3 proposals file. The proposer loads it. |
 | `amwst-region-capture` | *(helper)* Clipped, DOM/ARIA-scoped screenshots + scoped aria snapshots instead of full-page captures — token-cheap visual checks. |
