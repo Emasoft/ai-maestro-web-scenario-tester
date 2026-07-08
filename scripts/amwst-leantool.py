@@ -7,7 +7,7 @@ every turn. This wrapper runs the tool and prints a compact, greppable summary:
 a count line + one line per real problem (file:line:col  CODE message). Nothing
 else. On a clean run it prints just "TSC: 0 errors" etc.
 
-Stdlib only (subprocess, json, re) — run with `python3 amwst-leantool.py <sub> ...`.
+Stdlib only (subprocess, json, re). Invocation: python3 amwst-leantool.py <sub> ...
 Exit code mirrors the underlying tool (non-zero on any error) so it is CI-safe.
 
 NEVER swallow a real failure: if structured parsing is uncertain, it falls back
