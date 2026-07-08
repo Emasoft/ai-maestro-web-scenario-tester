@@ -2,7 +2,7 @@
 
 <!--BADGES-START-->
 [![CI](https://github.com/Emasoft/ai-maestro-web-scenario-tester/actions/workflows/ci.yml/badge.svg)](https://github.com/Emasoft/ai-maestro-web-scenario-tester/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-0.1.1-blue)
+![Version](https://img.shields.io/badge/version-0.1.2-blue)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 <!--BADGES-END-->
 
