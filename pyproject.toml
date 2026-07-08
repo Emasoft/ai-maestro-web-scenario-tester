@@ -7,6 +7,12 @@ requires-python = ">=3.10"
 [project.optional-dependencies]
 dev = [
     "pytest",
+    # pytest-split provides the --splits/--group flags ci.yml's test matrix
+    # shards with (TRDD-K7P2XR4Q). Without it every CI test leg dies with
+    # "unrecognized arguments: --splits --group" (pytest exit 4) — the exact
+    # red run 28959141245. Local `publish.py --gate` runs pytest WITHOUT
+    # shard flags, so only CI catches its absence.
+    "pytest-split",
     "ruff",
     "mypy",
 ]
