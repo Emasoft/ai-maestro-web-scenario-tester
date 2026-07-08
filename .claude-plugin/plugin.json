@@ -1,6 +1,6 @@
 {
   "name": "web-scenario-tester",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Browser-driven UI scenario-testing harness: author, run, and batch end-to-end scenario tests against a running web app via dev-browser, with fix-as-you-go, screenshots, structured reports, and 11th-hour improvement proposals. AI-Maestro MEMBER role-plugin.",
   "author": {
     "name": "Emasoft",
@@ -9,14 +9,26 @@
   "homepage": "https://github.com/Emasoft/ai-maestro-web-scenario-tester",
   "repository": "https://github.com/Emasoft/ai-maestro-web-scenario-tester",
   "license": "MIT",
-  "keywords": ["scenario-testing", "ui-testing", "e2e", "dev-browser", "browser-automation", "ai-maestro"],
+  "keywords": [
+    "scenario-testing",
+    "ui-testing",
+    "e2e",
+    "dev-browser",
+    "browser-automation",
+    "ai-maestro"
+  ],
   "dependencies": [
-    { "name": "dev-browser", "marketplace": "dev-browser-marketplace" }
+    {
+      "name": "dev-browser",
+      "marketplace": "dev-browser-marketplace"
+    }
   ],
   "cpv": {
     "pipeline_profile": "remote-validation",
     "pipeline": {
-      "intentional_divergence": [".github/workflows/notify-marketplace.yml"]
+      "intentional_divergence": [
+        ".github/workflows/notify-marketplace.yml"
+      ]
     }
   }
 }

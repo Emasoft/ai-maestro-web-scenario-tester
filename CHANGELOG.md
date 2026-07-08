@@ -2,12 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.1.1] — 2026-07-08
 
 ### Bug Fixes
 
 - **cpv:** Pass validate_plugin --strict — explicit bash interpreter + timeout=10 on write-guard hook, safe path expansion (drop eval-echo RC-120), MIT LICENSE, trim skill desc, context:fork; write-guard block/allow/inert behavior preserved (16620ea)
 - **cpv:** Clear all MAJOR/MINOR/NIT introduced by the restructure (TRDD-74ZS7P9U P7) (e1cac6f)
+- **cpv:** Clear all strict-validation findings — link, drift pin, lockfile, agent caps, examples (cad831e)
+- **ci-parity:** Shfmt-format all shell scripts + make helper template linter-parseable (270a3e1)
+- **security:** Devitalize docstring-backtick FP flagged CRITICAL by the security scan (f8e5882)
 
 ### Documentation
 
@@ -24,6 +27,8 @@ All notable changes to this project will be documented in this file.
 - **skills:** Add per-phase + validate skills, load-on-demand (TRDD-74ZS7P9U P4) (ffe9112)
 - **agents:** Split proposals into amwst-scenario-proposer; token-discipline runner (TRDD-74ZS7P9U P5a) (2c9ab98)
 - **orchestration:** Wire runner→proposer 2-agent flow + validator + tooling map (TRDD-74ZS7P9U P5b/P5c) (00fe41a)
+- **pipeline:** Wire the CPV canonical publish pipeline (remote-validation profile) (ede636d)
+- **pipeline:** The-skills-menu agent migration + network-resilience helper (498597b)
 
 ### Miscellaneous Tasks
 
