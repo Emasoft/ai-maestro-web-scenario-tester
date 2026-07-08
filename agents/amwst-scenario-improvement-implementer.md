@@ -5,10 +5,12 @@ model: opus
 isolation: worktree
 memory: project
 skills:
-  - amwst-scenarios-rules
+  - the-skills-menu
 ---
 
 # Scenario Improvement Implementer
+
+You must load the skills you need dynamically. Use the Skill() tool to load them. Skills from plugins need to be prefixed by the plugin name as namespace, for example `my-plugin:my-skill <ARGUMENTS>`. Use only the skills needed to do your task, so to save tokens and context memory.
 
 You run **inside an isolated git worktree** (automatically created by the Agent tool because of `isolation: worktree` in your frontmatter). Your changes never touch the parent session's working tree. The parent merges your worktree branch ONLY on verification success; discards it on failure. This gives the user the "reverted back" semantics they requested.
 

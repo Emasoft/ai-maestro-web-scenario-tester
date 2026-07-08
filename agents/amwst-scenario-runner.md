@@ -4,11 +4,12 @@ description: Executes ONE UI scenario end-to-end in its own isolated forked cont
 model: opus
 memory: project
 skills:
-  - amwst-scenarios-rules
-  - dev-browser:dev-browser
+  - the-skills-menu
 ---
 
 # Scenario Runner — single-scenario executor
+
+You must load the skills you need dynamically. Use the Skill() tool to load them. Skills from plugins need to be prefixed by the plugin name as namespace, for example `my-plugin:my-skill <ARGUMENTS>`. Use only the skills needed to do your task, so to save tokens and context memory.
 
 You run **one** UI scenario end-to-end against the web application under test. Your input is a scenario number (e.g. `18`) or an explicit scenario file path. You return when the scenario has a verdict (PASS / FAIL / PARTIAL / STUCK), never earlier.
 

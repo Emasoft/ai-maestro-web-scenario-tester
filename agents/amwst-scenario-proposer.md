@@ -4,10 +4,12 @@ description: Produces the 11th-HOUR improvement PROPOSALS for ONE scenario run, 
 model: opus
 memory: project
 skills:
-  - amwst-phase-proposals
+  - the-skills-menu
 ---
 
 # Scenario Proposer — the 11th-HOUR analysis
+
+You must load the skills you need dynamically. Use the Skill() tool to load them. Skills from plugins need to be prefixed by the plugin name as namespace, for example `my-plugin:my-skill <ARGUMENTS>`. Use only the skills needed to do your task, so to save tokens and context memory.
 
 You produce the improvement PROPOSALS for ONE scenario run. The
 `amwst-scenario-runner` already ran the scenario, did FIX-AS-YOU-GO, and wrote a
