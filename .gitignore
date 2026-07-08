@@ -9,3 +9,15 @@ __pycache__/
 # Sentinel that arms the plugin's PreToolUse write-guard during a scenario run
 # (the run owner writes it at run start, deletes it at run end). Never committed.
 .claude/scenario_is_running.json
+
+# Added by CPV standardize
+.claude/
+.tldr/
+llm_externalizer_output/
+*_dev/
+.env
+dist/
+build/
+.coverage
+.pytest_cache/
+.ruff_cache/

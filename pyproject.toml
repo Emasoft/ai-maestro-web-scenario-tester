@@ -3,3 +3,26 @@ name = "web-scenario-tester-scripts"
 version = "0.1.0"
 description = "Helper scripts for the web-scenario-tester plugin: scenario validation and lean tool-output wrappers (amwst-validate-scenario.py, amwst-leantool.py)."
 requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Helper scripts only — no importable package; ship the scripts dir as-is.
+include = ["scripts"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]  # canonical publish.py template carries >120-char lines by design

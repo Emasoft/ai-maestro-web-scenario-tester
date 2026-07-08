@@ -12,5 +12,8 @@
   "keywords": ["scenario-testing", "ui-testing", "e2e", "dev-browser", "browser-automation", "ai-maestro"],
   "dependencies": [
     { "name": "dev-browser", "marketplace": "dev-browser-marketplace" }
-  ]
+  ],
+  "cpv": {
+    "pipeline_profile": "remote-validation"
+  }
 }
