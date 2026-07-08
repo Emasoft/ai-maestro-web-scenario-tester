@@ -1,6 +1,6 @@
 # Notify marketplace repo when this plugin is updated
 # Requires MARKETPLACE_PAT secret (Personal Access Token with repo scope).
-# Create via: gh secret set MARKETPLACE_PAT --repo Emasoft/web-scenario-tester \
+# Create via: gh secret set MARKETPLACE_PAT --repo Emasoft/ai-maestro-web-scenario-tester \
 #               --body "$MARKETPLACE_PAT"
 # (assumes $MARKETPLACE_PAT is exported in your shell or .env file)
 
@@ -8,7 +8,10 @@ name: Notify Marketplace
 
 on:
   push:
-    branches: [main]
+    # Default branch is `master` (ci.yml already lists both). With only
+    # [main] this workflow NEVER fired — the marketplace was never notified
+    # of v0.1.1/v0.1.2. Keep both so a future branch rename stays covered.
+    branches: [master, main]
     paths:
       - '.claude-plugin/plugin.json'
       - 'hooks/**'
