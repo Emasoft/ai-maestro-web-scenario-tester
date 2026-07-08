@@ -14,6 +14,9 @@
     { "name": "dev-browser", "marketplace": "dev-browser-marketplace" }
   ],
   "cpv": {
-    "pipeline_profile": "remote-validation"
+    "pipeline_profile": "remote-validation",
+    "pipeline": {
+      "intentional_divergence": [".github/workflows/notify-marketplace.yml"]
+    }
   }
 }

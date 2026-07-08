@@ -227,3 +227,17 @@ Regardless of outcome, add a closing entry to your project memory log (`MEMORY.m
 ```
 
 The orchestrator reads MEMORY.md too when triaging new specs.
+## Examples
+
+<example>
+user: Implement the sidebar-badge feature per the spec; scope: components/Sidebar.tsx, lib/badges.ts.
+assistant: [works in the isolated worktree, type-checks + builds after each unit, commits clean, pushes the feature branch]
+DONE sidebar-badge — branch feat/sidebar-badge @ 3f2a91c, build+typecheck clean
+Smoke-test: verify badge count updates after a new message arrives
+</example>
+
+<example>
+user: Add CSV export to the report view; the build breaks on a missing peer dep you cannot install.
+assistant: [attempts the fix, build still fails after retry, defers rather than shipping broken code]
+DEFERRED csv-export — build fails on missing peer dep 'papaparse' (needs a dependency decision by the orchestrator)
+</example>

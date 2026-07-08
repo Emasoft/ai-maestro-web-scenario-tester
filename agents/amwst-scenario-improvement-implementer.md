@@ -162,3 +162,18 @@ If you are interrupted by a rate limit mid-implementation:
 2. Note the position in `MEMORY.md` under "Active run", including the next P0 item slug
 3. When resumed, check `MEMORY.md` and continue from the next P0 item
 4. Clear the "Active run" marker when the full proposal file is processed
+## Examples
+
+<example>
+user: Implement the approved proposals from the SCEN-014 improvements file.
+assistant: [creates an isolated worktree, applies each approved P0 item as its own commit, builds + tests after each, records SHAs]
+IMPLEMENTATIONS_OK branch=scen-014-improvements implemented=3 deferred=1
+Report: reports/scenarios-runner/implementer_SCEN-014_20260708T163000Z.md
+</example>
+
+<example>
+user: Apply the approved batch proposals; one needs a DB migration.
+assistant: [implements the source-only items; the migration item is out of automated scope]
+IMPLEMENTATIONS_OK branch=batch-improvements implemented=4 deferred=1 (P0-db-migration: DEFERRED — requires DB migration, outside automated scope)
+Report: reports/scenarios-runner/implementer_batch_20260708T164500Z.md
+</example>

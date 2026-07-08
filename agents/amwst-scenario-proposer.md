@@ -54,3 +54,18 @@ No proposal bodies inline — just the summary.
 2. **Reports under `${MAIN_PROJECT_ROOT}/reports/scenarios-runner/`** (Rule 14). Both `reports/` and `reports_dev/` are gitignored.
 3. **NEVER use `git add -A`, `git add .`, or `git push`.** (You generally do not commit — the orchestrator handles git.)
 4. **NEVER spawn nested subagents.**
+## Examples
+
+<example>
+user: The runner finished SCEN-012 — produce the 11th-hour proposals from its report.
+assistant: [reads reports/scenarios-runner/SCEN-012_<ts>.report.md + the scenario file, analyzes unfixed bugs and workflow gaps, writes the proposals file]
+[PROPOSALS] SCEN-012 — 6 proposals (1 P0, 2 P1, 2 P2, 1 P3)
+Improvements: reports/scenarios-runner/scenario_proposed-improvements_012_20260708T161500Z.md
+</example>
+
+<example>
+user: Analyze the SCEN-003 report; the run passed clean.
+assistant: [report shows zero bugs; still mines issues-noticed + step friction for improvements]
+[PROPOSALS] SCEN-003 — 2 proposals (0 P0, 0 P1, 1 P2, 1 P3)
+Improvements: reports/scenarios-runner/scenario_proposed-improvements_003_20260708T162000Z.md
+</example>

@@ -220,3 +220,16 @@ Add a run entry to your project memory log (`MEMORY.md`):
 
 The orchestrator reads this to detect flaky smoke tests vs. genuine
 regressions.
+## Examples
+
+<example>
+user: Smoke-test the just-merged sidebar-badge feature (≤10 steps): badge appears after a message.
+assistant: [drives the running dashboard via dev-browser, scoped snapshots, no full reports]
+PASS sidebar-badge — 7/7 steps, badge increments and clears as specced
+</example>
+
+<example>
+user: Verify the new delete-confirmation modal works after the merge.
+assistant: [step 4 fails — modal never opens; captures one failure screenshot, stops]
+FAIL delete-confirmation — 4/9 steps; modal does not open from the row action menu (screenshot: reports/scenarios-runner/screenshots/smoke_delete-confirmation_S4.jpg)
+</example>

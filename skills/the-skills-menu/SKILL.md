@@ -66,7 +66,7 @@ All entries above are invoked as
 
 ## Resources
 
-- [the-skills-menu-create](../the-skills-menu-create/SKILL.md) —
+- `claude-plugins-validation:the-skills-menu-create` —
   the migrator skill in the CPV plugin that can regenerate this
   catalog from the plugin's current skill inventory at any time
   (not bundled in this plugin; install
