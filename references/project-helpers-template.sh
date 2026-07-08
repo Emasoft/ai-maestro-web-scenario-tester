@@ -62,8 +62,10 @@ DB_FLAGS=(--browser "$APP_BROWSER" --headless --timeout 60)
 # IMPLEMENT FOR YOUR APP: replace the selectors below with your real login
 # form's input / button selectors.
 app_login() {
-  local password="${1:?app_login: missing password argument}"
-  dev-browser "${DB_FLAGS[@]}" <<EOF
+	local password="${1:?app_login: missing password argument}"
+	local password_json
+	password_json="$(printf '%s' "$password" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
+	dev-browser "${DB_FLAGS[@]}" <<EOF
 const page = await browser.getPage("dashboard");
 try {
   if (page.url() === "about:blank" || !page.url().startsWith("${APP_DASHBOARD_URL}")) {
@@ -79,7 +81,7 @@ const pre = await page.evaluate(() => ({
 }));
 let already = !pre.hasLoginForm;
 if (!already) {
-  await page.fill('input[type="password"]', ${password@@JSON_STRING@@});
+  await page.fill('input[type="password"]', ${password_json});
   await page.click('button[type="submit"]');
   await new Promise(r => setTimeout(r, 3000));
 }
@@ -103,8 +105,10 @@ EOF
 #
 # IMPLEMENT FOR YOUR APP: replace the modal locator + field/button selectors.
 app_confirm_modal() {
-  local password="${1:?app_confirm_modal: missing password argument}"
-  dev-browser "${DB_FLAGS[@]}" <<EOF
+	local password="${1:?app_confirm_modal: missing password argument}"
+	local password_json
+	password_json="$(printf '%s' "$password" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
+	dev-browser "${DB_FLAGS[@]}" <<EOF
 const page = await browser.getPage("dashboard");
 // TODO(yourapp): replace with your confirm/sudo modal's real selectors.
 const present = await page.evaluate(() =>
@@ -112,7 +116,7 @@ const present = await page.evaluate(() =>
 if (!present) {
   console.log(JSON.stringify({ ok: true, modal: false }));
 } else {
-  await page.fill('[role="dialog"][aria-modal="true"] input[type="password"]', ${password@@JSON_STRING@@});
+  await page.fill('[role="dialog"][aria-modal="true"] input[type="password"]', ${password_json});
   await page.click('[role="dialog"][aria-modal="true"] button');
   await new Promise(r => setTimeout(r, 1500));
   console.log(JSON.stringify({ ok: true, modal: true }));
@@ -139,18 +143,18 @@ EOF
 #
 # IMPLEMENT FOR YOUR APP.
 app_create_entity() {
-  local name="${1:?app_create_entity: missing name}"
-  shift || true
-  # TODO(yourapp): click "New", fill the form, submit; screenshot via app_screenshot.
-  echo "TODO: implement app_create_entity for $name" >&2
-  return 1
+	local name="${1:?app_create_entity: missing name}"
+	shift || true
+	# TODO(yourapp): click "New", fill the form, submit; screenshot via app_screenshot.
+	echo "TODO: implement app_create_entity for $name" >&2
+	return 1
 }
 
 app_delete_entity() {
-  local ref="${1:?app_delete_entity: missing name-or-id}"
-  # TODO(yourapp): open the entity, click delete, handle app_confirm_modal, verify gone.
-  echo "TODO: implement app_delete_entity for $ref" >&2
-  return 1
+	local ref="${1:?app_delete_entity: missing name-or-id}"
+	# TODO(yourapp): open the entity, click delete, handle app_confirm_modal, verify gone.
+	echo "TODO: implement app_delete_entity for $ref" >&2
+	return 1
 }
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -160,14 +164,16 @@ app_delete_entity() {
 #   Save a JPEG screenshot of the current dashboard page into the per-run
 #   screenshots dir under $APP_SCREENSHOTS_ROOT. Filenames follow Rule 10.
 app_screenshot() {
-  local step="${1:?app_screenshot: missing step-id}"
-  local desc="${2:?app_screenshot: missing short-desc}"
-  local run_id="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
-  local out_dir="$APP_SCREENSHOTS_ROOT/${SCEN_ID:-SCEN-000}_${run_id}"
-  mkdir -p "$out_dir"
-  dev-browser "${DB_FLAGS[@]}" <<EOF
+	local step="${1:?app_screenshot: missing step-id}"
+	local desc="${2:?app_screenshot: missing short-desc}"
+	local run_id="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
+	local out_dir="$APP_SCREENSHOTS_ROOT/${SCEN_ID:-SCEN-000}_${run_id}"
+	mkdir -p "$out_dir"
+	local out_dir_json
+	out_dir_json="$(printf '%s' "$out_dir" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
+	dev-browser "${DB_FLAGS[@]}" <<EOF
 const page = await browser.getPage("dashboard");
-await saveScreenshot(page, ${out_dir@@JSON_STRING@@} + "/${step}_${run_id}_${desc}.jpg", { type: "jpeg", quality: 97 });
+await saveScreenshot(page, ${out_dir_json} + "/${step}_${run_id}_${desc}.jpg", { type: "jpeg", quality: 97 });
 console.log("screenshot ${step}");
 EOF
 }
@@ -175,11 +181,10 @@ EOF
 # ─────────────────────────────────────────────────────────────────────────
 # NOTES
 # ─────────────────────────────────────────────────────────────────────────
-# * `${var@@JSON_STRING@@}` above is a placeholder reminding you to JSON-encode
-#   the password before interpolating it into the QuickJS heredoc (e.g. with
-#   `printf '%s' "$password" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))'`),
-#   so quotes/backslashes in a password can't break the script. Replace it with
-#   your real encoding before use.
+# * The `*_json` locals JSON-encode a shell value before it is interpolated
+#   into the QuickJS heredoc, so quotes/backslashes in a password or path can
+#   never break (or inject into) the script. Keep that encoding when you adapt
+#   these helpers — interpolate `${password_json}`, never the raw `$password`.
 # * Load the dev-browser API surface via the `dev-browser:dev-browser` skill —
 #   do NOT hardcode any path under the dev-browser plugin cache; it is ephemeral.
 # * Every function spawns ONE short-lived QuickJS sandbox via the persistent

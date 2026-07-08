@@ -33,32 +33,41 @@ set -eu
 # Prefer ${CLAUDE_PLUGIN_ROOT} (set when invoked inside Claude Code). Fall back
 # to deriving it from this script's own location so the script also runs by hand.
 if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
-    PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT"
+	PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT"
 else
-    SELF_DIR=$(cd "$(dirname "$0")" && pwd)
-    PLUGIN_ROOT=$(cd "$SELF_DIR/.." && pwd)
+	SELF_DIR=$(cd "$(dirname "$0")" && pwd)
+	PLUGIN_ROOT=$(cd "$SELF_DIR/.." && pwd)
 fi
 
 # ---- Resolve the consumer project root ----
 if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
-    PROJECT_DIR="$CLAUDE_PROJECT_DIR"
+	PROJECT_DIR="$CLAUDE_PROJECT_DIR"
 else
-    PROJECT_DIR=$(pwd)
+	PROJECT_DIR=$(pwd)
 fi
 
 # ---- Parse args ----
 LINK_MODE=0
 SCENARIOS_DIR_REL="tests/scenarios"
 while [ $# -gt 0 ]; do
-    case "$1" in
-        --link) LINK_MODE=1; shift ;;
-        --scenarios-dir) SCENARIOS_DIR_REL="$2"; shift 2 ;;
-        -h|--help)
-            sed -n '2,30p' "$0"
-            exit 0
-            ;;
-        *) echo "init-scenarios-folder: unknown arg: $1" >&2; exit 2 ;;
-    esac
+	case "$1" in
+	--link)
+		LINK_MODE=1
+		shift
+		;;
+	--scenarios-dir)
+		SCENARIOS_DIR_REL="$2"
+		shift 2
+		;;
+	-h | --help)
+		sed -n '2,30p' "$0"
+		exit 0
+		;;
+	*)
+		echo "init-scenarios-folder: unknown arg: $1" >&2
+		exit 2
+		;;
+	esac
 done
 
 PLUGIN_SCRIPTS="$PLUGIN_ROOT/scripts"
@@ -71,94 +80,94 @@ echo "[init-scenarios] scenarios   : $SCEN_DIR"
 
 # Sanity: the bundled content must exist.
 if [ ! -d "$PLUGIN_SCRIPTS" ] || [ ! -d "$PLUGIN_REFS" ]; then
-    echo "[init-scenarios] ERROR: plugin scripts/ or references/ not found under $PLUGIN_ROOT" >&2
-    echo "[init-scenarios]        is CLAUDE_PLUGIN_ROOT set correctly?" >&2
-    exit 1
+	echo "[init-scenarios] ERROR: plugin scripts/ or references/ not found under $PLUGIN_ROOT" >&2
+	echo "[init-scenarios]        is CLAUDE_PLUGIN_ROOT set correctly?" >&2
+	exit 1
 fi
 
 # ---- Step 3 (do dirs first so later steps can write into them) ----
 echo "[init-scenarios] creating folders"
 for d in \
-    "$SCEN_DIR" \
-    "$SCEN_DIR/state" \
-    "$SCEN_DIR/state-backups" \
-    "$SCEN_DIR/fixtures/git" \
-    "$SCEN_DIR/scripts" \
-    "$SCEN_DIR/scripts/dev-browser-helpers" \
-    "$PROJECT_DIR/reports/scenarios-runner" \
-    "$PROJECT_DIR/.claude" ; do
-    if [ ! -d "$d" ]; then
-        mkdir -p "$d"
-        echo "[init-scenarios]   + $d"
-    fi
+	"$SCEN_DIR" \
+	"$SCEN_DIR/state" \
+	"$SCEN_DIR/state-backups" \
+	"$SCEN_DIR/fixtures/git" \
+	"$SCEN_DIR/scripts" \
+	"$SCEN_DIR/scripts/dev-browser-helpers" \
+	"$PROJECT_DIR/reports/scenarios-runner" \
+	"$PROJECT_DIR/.claude"; do
+	if [ ! -d "$d" ]; then
+		mkdir -p "$d"
+		echo "[init-scenarios]   + $d"
+	fi
 done
 
 # ---- Step 1: canonical rules doc (always refresh — the plugin owns it) ----
 echo "[init-scenarios] installing SCENARIOS_TESTS_RULES.md"
 if [ -f "$PLUGIN_REFS/SCENARIOS_TESTS_RULES.md" ]; then
-    cp "$PLUGIN_REFS/SCENARIOS_TESTS_RULES.md" "$SCEN_DIR/SCENARIOS_TESTS_RULES.md"
-    echo "[init-scenarios]   = $SCEN_DIR/SCENARIOS_TESTS_RULES.md (refreshed)"
+	cp "$PLUGIN_REFS/SCENARIOS_TESTS_RULES.md" "$SCEN_DIR/SCENARIOS_TESTS_RULES.md"
+	echo "[init-scenarios]   = $SCEN_DIR/SCENARIOS_TESTS_RULES.md (refreshed)"
 else
-    echo "[init-scenarios]   WARN: rules doc missing in plugin references/" >&2
+	echo "[init-scenarios]   WARN: rules doc missing in plugin references/" >&2
 fi
 
 # ---- Step 2: NEXT_SCEN_NUMBER (seed only if absent) ----
 if [ ! -f "$SCEN_DIR/NEXT_SCEN_NUMBER" ]; then
-    printf '1\n' > "$SCEN_DIR/NEXT_SCEN_NUMBER"
-    echo "[init-scenarios]   + NEXT_SCEN_NUMBER=1"
+	printf '1\n' >"$SCEN_DIR/NEXT_SCEN_NUMBER"
+	echo "[init-scenarios]   + NEXT_SCEN_NUMBER=1"
 else
-    echo "[init-scenarios]   = NEXT_SCEN_NUMBER kept ($(cat "$SCEN_DIR/NEXT_SCEN_NUMBER" 2>/dev/null))"
+	echo "[init-scenarios]   = NEXT_SCEN_NUMBER kept ($(cat "$SCEN_DIR/NEXT_SCEN_NUMBER" 2>/dev/null))"
 fi
 
 # ---- Step 4: shared engine scripts (copy or symlink; always refresh) ----
 echo "[init-scenarios] installing engine scripts ($([ "$LINK_MODE" -eq 1 ] && echo symlink || echo copy))"
 for s in \
-    scenario-setup.sh \
-    scenario-restore.sh \
-    state-machine-tick.sh \
-    compress-screenshots.sh \
-    master-cleanup.sh \
-    generate-consolidated-proposals.sh ; do
-    src="$PLUGIN_SCRIPTS/$s"
-    dst="$SCEN_DIR/scripts/$s"
-    if [ ! -f "$src" ]; then
-        echo "[init-scenarios]   WARN: engine script missing in plugin: $s" >&2
-        continue
-    fi
-    if [ "$LINK_MODE" -eq 1 ]; then
-        ln -sf "$src" "$dst"
-    else
-        cp "$src" "$dst"
-        chmod +x "$dst" 2>/dev/null || true
-    fi
-    echo "[init-scenarios]   = $s"
+	scenario-setup.sh \
+	scenario-restore.sh \
+	state-machine-tick.sh \
+	compress-screenshots.sh \
+	master-cleanup.sh \
+	generate-consolidated-proposals.sh; do
+	src="$PLUGIN_SCRIPTS/$s"
+	dst="$SCEN_DIR/scripts/$s"
+	if [ ! -f "$src" ]; then
+		echo "[init-scenarios]   WARN: engine script missing in plugin: $s" >&2
+		continue
+	fi
+	if [ "$LINK_MODE" -eq 1 ]; then
+		ln -sf "$src" "$dst"
+	else
+		cp "$src" "$dst"
+		chmod +x "$dst" 2>/dev/null || true
+	fi
+	echo "[init-scenarios]   = $s"
 done
 
 # ---- Step 5: starter scenarios.config.json (only if absent) ----
 CFG="$SCEN_DIR/scenarios.config.json"
 if [ ! -f "$CFG" ]; then
-    if [ -f "$PLUGIN_REFS/scenarios.config.template.json" ]; then
-        cp "$PLUGIN_REFS/scenarios.config.template.json" "$CFG"
-        echo "[init-scenarios]   + scenarios.config.json (starter — EDIT IT: see references/scenarios.config.README.md)"
-    else
-        echo "[init-scenarios]   WARN: config template missing in plugin references/" >&2
-    fi
+	if [ -f "$PLUGIN_REFS/scenarios.config.template.json" ]; then
+		cp "$PLUGIN_REFS/scenarios.config.template.json" "$CFG"
+		echo "[init-scenarios]   + scenarios.config.json (starter — EDIT IT: see references/scenarios.config.README.md)"
+	else
+		echo "[init-scenarios]   WARN: config template missing in plugin references/" >&2
+	fi
 else
-    echo "[init-scenarios]   = scenarios.config.json kept (already configured)"
+	echo "[init-scenarios]   = scenarios.config.json kept (already configured)"
 fi
 
 # ---- Step 6: project helpers stub (only if absent) ----
 HELPERS_DST="$SCEN_DIR/scripts/dev-browser-helpers/project-helpers.sh"
 if [ ! -f "$HELPERS_DST" ]; then
-    if [ -f "$PLUGIN_REFS/project-helpers-template.sh" ]; then
-        cp "$PLUGIN_REFS/project-helpers-template.sh" "$HELPERS_DST"
-        chmod +x "$HELPERS_DST" 2>/dev/null || true
-        echo "[init-scenarios]   + dev-browser-helpers/project-helpers.sh (STUB — implement the 3 helpers for your app)"
-    else
-        echo "[init-scenarios]   WARN: project-helpers template missing in plugin references/" >&2
-    fi
+	if [ -f "$PLUGIN_REFS/project-helpers-template.sh" ]; then
+		cp "$PLUGIN_REFS/project-helpers-template.sh" "$HELPERS_DST"
+		chmod +x "$HELPERS_DST" 2>/dev/null || true
+		echo "[init-scenarios]   + dev-browser-helpers/project-helpers.sh (STUB — implement the 3 helpers for your app)"
+	else
+		echo "[init-scenarios]   WARN: project-helpers template missing in plugin references/" >&2
+	fi
 else
-    echo "[init-scenarios]   = dev-browser-helpers/project-helpers.sh kept"
+	echo "[init-scenarios]   = dev-browser-helpers/project-helpers.sh kept"
 fi
 
 # ---- Step 7: gitignore the write-guard run sentinel (idempotent) ----
@@ -172,15 +181,15 @@ echo "[init-scenarios] ensuring write-guard run sentinel is gitignored"
 GITIGNORE="$PROJECT_DIR/.gitignore"
 SENTINEL_IGNORE_LINE=".claude/scenario_is_running.json"
 if [ -f "$GITIGNORE" ] && grep -qxF "$SENTINEL_IGNORE_LINE" "$GITIGNORE" 2>/dev/null; then
-    echo "[init-scenarios]   = .gitignore already ignores $SENTINEL_IGNORE_LINE"
+	echo "[init-scenarios]   = .gitignore already ignores $SENTINEL_IGNORE_LINE"
 else
-    # Append a trailing newline first if the file exists and lacks one, so the
-    # new entry never glues onto the last line.
-    if [ -f "$GITIGNORE" ] && [ -n "$(tail -c 1 "$GITIGNORE" 2>/dev/null)" ]; then
-        printf '\n' >> "$GITIGNORE"
-    fi
-    printf '%s\n' "$SENTINEL_IGNORE_LINE" >> "$GITIGNORE"
-    echo "[init-scenarios]   + .gitignore <- $SENTINEL_IGNORE_LINE"
+	# Append a trailing newline first if the file exists and lacks one, so the
+	# new entry never glues onto the last line.
+	if [ -f "$GITIGNORE" ] && [ -n "$(tail -c 1 "$GITIGNORE" 2>/dev/null)" ]; then
+		printf '\n' >>"$GITIGNORE"
+	fi
+	printf '%s\n' "$SENTINEL_IGNORE_LINE" >>"$GITIGNORE"
+	echo "[init-scenarios]   + .gitignore <- $SENTINEL_IGNORE_LINE"
 fi
 
 # NOTE: scenario .scen.md files are PROJECT-SCOPED artifacts and MUST stay

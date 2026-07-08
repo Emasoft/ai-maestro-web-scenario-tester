@@ -27,9 +27,9 @@ set -euo pipefail
 
 # ---- Resolve project root (worktree-safe) ----
 if MAIN_ROOT="$(git rev-parse --git-common-dir 2>/dev/null)"; then
-  MAIN_ROOT="$(cd "$(dirname "$MAIN_ROOT")" && pwd)"
+	MAIN_ROOT="$(cd "$(dirname "$MAIN_ROOT")" && pwd)"
 else
-  MAIN_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+	MAIN_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 fi
 
 STATE_DIR="$MAIN_ROOT/tests/scenarios/state"
@@ -39,46 +39,55 @@ STALE_THRESHOLD_MIN=90
 DRY_RUN=0
 
 while [ $# -gt 0 ]; do
-  case "$1" in
-    --stale-min) STALE_THRESHOLD_MIN="$2"; shift 2 ;;
-    --dry-run)   DRY_RUN=1; shift ;;
-    *) echo "ERROR unknown-arg-$1" ; exit 2 ;;
-  esac
+	case "$1" in
+	--stale-min)
+		STALE_THRESHOLD_MIN="$2"
+		shift 2
+		;;
+	--dry-run)
+		DRY_RUN=1
+		shift
+		;;
+	*)
+		echo "ERROR unknown-arg-$1"
+		exit 2
+		;;
+	esac
 done
 
 if [ ! -f "$STATE_FILE" ]; then
-  echo "ERROR state-file-missing"
-  exit 2
+	echo "ERROR state-file-missing"
+	exit 2
 fi
 
 # ---- Helper: write recovery log entry ----
 log_recovery() {
-  local msg="$1"
-  printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$msg" >> "$RECOVERY_LOG"
+	local msg="$1"
+	printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$msg" >>"$RECOVERY_LOG"
 }
 
 # ---- Step 1: validate JSON and read phase ----
 if ! python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$STATE_FILE" 2>/dev/null; then
-  echo "ERROR state-file-corrupt"
-  exit 2
+	echo "ERROR state-file-corrupt"
+	exit 2
 fi
 
 PHASE="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('phase',''))" "$STATE_FILE")"
 
 case "$PHASE" in
-  consolidated|failed)
-    echo "DONE"
-    exit 0
-    ;;
-  master_cleanup)
-    echo "CLEANUP"
-    exit 0
-    ;;
-  master_setup|running) ;;
-  *)
-    echo "ERROR unknown-phase-$PHASE"
-    exit 2
-    ;;
+consolidated | failed)
+	echo "DONE"
+	exit 0
+	;;
+master_cleanup)
+	echo "CLEANUP"
+	exit 0
+	;;
+master_setup | running) ;;
+*)
+	echo "ERROR unknown-phase-$PHASE"
+	exit 2
+	;;
 esac
 
 # ---- Step 2: detect stale in_progress and reset to pending ----
@@ -189,7 +198,8 @@ for scen_id, reason in recovery_entries:
 PYEOF
 
 # ---- Step 3: determine next action ----
-NEXT="$(python3 - "$STATE_FILE" <<'PYEOF'
+NEXT="$(
+	python3 - "$STATE_FILE" <<'PYEOF'
 import json, sys
 with open(sys.argv[1]) as f:
     state = json.load(f)
@@ -217,7 +227,7 @@ PYEOF
 
 # ---- Step 4: if we returned CLEANUP, advance phase=running → master_cleanup ----
 if [ "$NEXT" = "CLEANUP" ] && [ "$PHASE" = "running" ] && [ "$DRY_RUN" -eq 0 ]; then
-  python3 - "$STATE_FILE" <<'PYEOF'
+	python3 - "$STATE_FILE" <<'PYEOF'
 import json, sys, os
 with open(sys.argv[1]) as f:
     state = json.load(f)
@@ -228,7 +238,7 @@ with open(tmp, "w") as f:
     f.write("\n")
 os.replace(tmp, sys.argv[1])
 PYEOF
-  log_recovery "PHASE_ADVANCE running -> master_cleanup"
+	log_recovery "PHASE_ADVANCE running -> master_cleanup"
 fi
 
 echo "$NEXT"

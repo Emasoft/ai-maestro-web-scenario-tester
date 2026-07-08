@@ -18,9 +18,9 @@
 set -euo pipefail
 
 if MAIN_ROOT="$(git rev-parse --git-common-dir 2>/dev/null)"; then
-  MAIN_ROOT="$(cd "$(dirname "$MAIN_ROOT")" && pwd)"
+	MAIN_ROOT="$(cd "$(dirname "$MAIN_ROOT")" && pwd)"
 else
-  MAIN_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+	MAIN_ROOT="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 fi
 
 STATE_FILE="$MAIN_ROOT/tests/scenarios/state/autonomous-batch-state.json"
@@ -29,19 +29,31 @@ OUT=""
 QUIET=0
 
 while [ $# -gt 0 ]; do
-  case "$1" in
-    --out)   OUT="$2"; shift 2 ;;
-    --quiet) QUIET=1; shift ;;
-    *) echo "ERROR unknown-arg-$1" >&2; exit 2 ;;
-  esac
+	case "$1" in
+	--out)
+		OUT="$2"
+		shift 2
+		;;
+	--quiet)
+		QUIET=1
+		shift
+		;;
+	*)
+		echo "ERROR unknown-arg-$1" >&2
+		exit 2
+		;;
+	esac
 done
 
-[ -f "$STATE_FILE" ] || { echo "ERROR state-file-missing: $STATE_FILE" >&2; exit 2; }
+[ -f "$STATE_FILE" ] || {
+	echo "ERROR state-file-missing: $STATE_FILE" >&2
+	exit 2
+}
 
 # Default output path embeds batch_id from state file
 if [ -z "$OUT" ]; then
-  BATCH_ID="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('batch_id','unknown'))" "$STATE_FILE")"
-  OUT="$REPORTS_DIR/CONSOLIDATED_PROPOSALS_${BATCH_ID}.md"
+	BATCH_ID="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('batch_id','unknown'))" "$STATE_FILE")"
+	OUT="$REPORTS_DIR/CONSOLIDATED_PROPOSALS_${BATCH_ID}.md"
 fi
 
 mkdir -p "$(dirname "$OUT")"

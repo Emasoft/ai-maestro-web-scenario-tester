@@ -21,12 +21,18 @@ cd "$PROJECT_DIR"
 # Resolve the scenario file via a glob (SC2012: avoid parsing `ls`). nullglob
 # makes a no-match expand to nothing so the guard below fires cleanly.
 shopt -s nullglob
-_scen_matches=( "tests/scenarios/SCEN-${NNN}_"*.scen.md )
+_scen_matches=("tests/scenarios/SCEN-${NNN}_"*.scen.md)
 shopt -u nullglob
 SCEN_FILE="${_scen_matches[0]:-}"
-[ -f "$SCEN_FILE" ] || { echo "SETUP_FAIL scenario file not found for SCEN-$NNN" >&2; exit 1; }
+[ -f "$SCEN_FILE" ] || {
+	echo "SETUP_FAIL scenario file not found for SCEN-$NNN" >&2
+	exit 1
+}
 
-command -v yq >/dev/null 2>&1 || { echo "SETUP_FAIL 'yq' not on PATH (required for frontmatter parsing)" >&2; exit 1; }
+command -v yq >/dev/null 2>&1 || {
+	echo "SETUP_FAIL 'yq' not on PATH (required for frontmatter parsing)" >&2
+	exit 1
+}
 
 FM=$(awk '/^---$/{c++; if(c==2) exit; next} c==1' "$SCEN_FILE")
 
@@ -36,21 +42,21 @@ FM=$(awk '/^---$/{c++; if(c==2) exit; next} c==1' "$SCEN_FILE")
 # failure aborts setup with the scenario name, the key, and the yq stderr
 # so the author can fix the frontmatter before state-wipe proceeds.
 parse_list() {
-  local key="$1"
-  local out err rc=0
-  err=$(mktemp)
-  out=$(echo "$FM" | yq e ".[\"$key\"][]? // \"\"" - 2>"$err") || rc=$?
-  if [ "$rc" -ne 0 ]; then
-    echo "SETUP_FAIL yq parse error for key '$key' in $(basename "$SCEN_FILE") — fix frontmatter then re-run" >&2
-    echo "--- yq stderr ---" >&2
-    cat "$err" >&2
-    echo "--- frontmatter ---" >&2
-    echo "$FM" >&2
-    rm -f "$err"
-    exit 1
-  fi
-  rm -f "$err"
-  printf '%s' "$out"
+	local key="$1"
+	local out err rc=0
+	err=$(mktemp)
+	out=$(echo "$FM" | yq e ".[\"$key\"][]? // \"\"" - 2>"$err") || rc=$?
+	if [ "$rc" -ne 0 ]; then
+		echo "SETUP_FAIL yq parse error for key '$key' in $(basename "$SCEN_FILE") — fix frontmatter then re-run" >&2
+		echo "--- yq stderr ---" >&2
+		cat "$err" >&2
+		echo "--- frontmatter ---" >&2
+		echo "$FM" >&2
+		rm -f "$err"
+		exit 1
+	fi
+	rm -f "$err"
+	printf '%s' "$out"
 }
 
 # SAFE path expansion — replaces the former `eval echo "$path"` (RC-120 RCE).
@@ -60,27 +66,27 @@ parse_list() {
 # expansion (`${!name}`), so only real env vars are substituted and command
 # substitution / arithmetic / globbing in the path can never execute.
 expand_path() {
-  local path="$1"
-  # Leading tilde → $HOME (only the very first char, like a shell would).
-  # shellcheck disable=SC2088  # the '~' here are LITERAL match-patterns on the
-  # input string (we are detecting a leading tilde to expand it ourselves), not
-  # an attempt to have the shell tilde-expand — expansion is done via $HOME below.
-  case "$path" in
-    '~')   path="$HOME" ;;
-    '~/'*) path="${HOME}/${path#'~/'}" ;;
-  esac
-  # Resolve ${VAR} and $VAR references with no eval. Loop until no more
-  # well-formed references remain (handles multiple/adjacent vars).
-  local out="" rest="$path" pre name val
-  while [[ "$rest" =~ \$\{?([A-Za-z_][A-Za-z0-9_]*)\}? ]]; do
-    name="${BASH_REMATCH[1]}"
-    pre="${rest%%"${BASH_REMATCH[0]}"*}"   # text before the match
-    val="${!name-}"                         # env value (empty if unset)
-    out+="${pre}${val}"
-    rest="${rest#*"${BASH_REMATCH[0]}"}"    # text after the match
-  done
-  out+="$rest"
-  printf '%s' "$out"
+	local path="$1"
+	# Leading tilde → $HOME (only the very first char, like a shell would).
+	# shellcheck disable=SC2088  # the '~' here are LITERAL match-patterns on the
+	# input string (we are detecting a leading tilde to expand it ourselves), not
+	# an attempt to have the shell tilde-expand — expansion is done via $HOME below.
+	case "$path" in
+	'~') path="$HOME" ;;
+	'~/'*) path="${HOME}/${path#'~/'}" ;;
+	esac
+	# Resolve ${VAR} and $VAR references with no eval. Loop until no more
+	# well-formed references remain (handles multiple/adjacent vars).
+	local out="" rest="$path" pre name val
+	while [[ "$rest" =~ \$\{?([A-Za-z_][A-Za-z0-9_]*)\}? ]]; do
+		name="${BASH_REMATCH[1]}"
+		pre="${rest%%"${BASH_REMATCH[0]}"*}" # text before the match
+		val="${!name-}"                      # env value (empty if unset)
+		out+="${pre}${val}"
+		rest="${rest#*"${BASH_REMATCH[0]}"}" # text after the match
+	done
+	out+="$rest"
+	printf '%s' "$out"
 }
 
 REWIPE=$(parse_list "rewipe-list")
@@ -91,72 +97,72 @@ TS=$(date -u +%Y%m%dT%H%M%SZ)
 BACKUP_DIR="$PROJECT_DIR/tests/scenarios/state-backups/SCEN-${NNN}_${TS}"
 mkdir -p "$BACKUP_DIR"
 MANIFEST="$BACKUP_DIR/MANIFEST.sha256"
-: > "$MANIFEST"
+: >"$MANIFEST"
 
 echo "SETUP_BEGIN SCEN-$NNN ts=$TS"
 
 if [ -n "$REWIPE" ]; then
-  while IFS= read -r f; do
-    [ -z "$f" ] && continue
-    f_exp=$(expand_path "$f")
-    if [ -f "$f_exp" ]; then
-      if [[ "$f_exp" == "$HOME"* ]]; then
-        rel="HOME${f_exp#"$HOME"}"
-      else
-        rel="ROOT${f_exp}"
-      fi
-      mkdir -p "$BACKUP_DIR/$(dirname "$rel")"
-      cp -p "$f_exp" "$BACKUP_DIR/$rel"
-      sha=$(shasum -a 256 "$f_exp" | awk '{print $1}')
-      echo "$sha  $f_exp  $rel" >> "$MANIFEST"
-      echo "BACKUP $f_exp"
-    else
-      echo "BACKUP_SKIP $f_exp (not present)"
-    fi
-  done <<< "$REWIPE"
+	while IFS= read -r f; do
+		[ -z "$f" ] && continue
+		f_exp=$(expand_path "$f")
+		if [ -f "$f_exp" ]; then
+			if [[ "$f_exp" == "$HOME"* ]]; then
+				rel="HOME${f_exp#"$HOME"}"
+			else
+				rel="ROOT${f_exp}"
+			fi
+			mkdir -p "$BACKUP_DIR/$(dirname "$rel")"
+			cp -p "$f_exp" "$BACKUP_DIR/$rel"
+			sha=$(shasum -a 256 "$f_exp" | awk '{print $1}')
+			echo "$sha  $f_exp  $rel" >>"$MANIFEST"
+			echo "BACKUP $f_exp"
+		else
+			echo "BACKUP_SKIP $f_exp (not present)"
+		fi
+	done <<<"$REWIPE"
 fi
 
 FIXTURE_GIT_ROOT="$PROJECT_DIR/tests/scenarios/fixtures/git"
 if [ -n "$GITFIX" ]; then
-  mkdir -p "$FIXTURE_GIT_ROOT"
-  idx=0
-  while IFS= read -r url; do
-    [ -z "$url" ] && continue
-    repo_name=$(basename "$url" .git)
-    local_path="$FIXTURE_GIT_ROOT/$repo_name"
-    if [ ! -d "$local_path/.git" ]; then
-      echo "SETUP_FAIL git-fixture[$idx] $url — expected local clone at $local_path; scenario author must prepare the fork in advance" >&2
-      exit 1
-    fi
-    if ! git -C "$local_path" rev-parse --verify scenario-start >/dev/null 2>&1; then
-      echo "SETUP_FAIL git-fixture[$idx] $local_path missing tag 'scenario-start'" >&2
-      exit 1
-    fi
-    git -C "$local_path" reset --hard scenario-start >/dev/null
-    git -C "$local_path" clean -fdx >/dev/null
-    echo "GITFIX[$idx]=$local_path (reset to scenario-start)"
-    idx=$((idx+1))
-  done <<< "$GITFIX"
+	mkdir -p "$FIXTURE_GIT_ROOT"
+	idx=0
+	while IFS= read -r url; do
+		[ -z "$url" ] && continue
+		repo_name=$(basename "$url" .git)
+		local_path="$FIXTURE_GIT_ROOT/$repo_name"
+		if [ ! -d "$local_path/.git" ]; then
+			echo "SETUP_FAIL git-fixture[$idx] $url — expected local clone at $local_path; scenario author must prepare the fork in advance" >&2
+			exit 1
+		fi
+		if ! git -C "$local_path" rev-parse --verify scenario-start >/dev/null 2>&1; then
+			echo "SETUP_FAIL git-fixture[$idx] $local_path missing tag 'scenario-start'" >&2
+			exit 1
+		fi
+		git -C "$local_path" reset --hard scenario-start >/dev/null
+		git -C "$local_path" clean -fdx >/dev/null
+		echo "GITFIX[$idx]=$local_path (reset to scenario-start)"
+		idx=$((idx + 1))
+	done <<<"$GITFIX"
 fi
 
 if [ -n "$FOLDFIX" ]; then
-  idx=0
-  while IFS= read -r p; do
-    [ -z "$p" ] && continue
-    p_exp=$(expand_path "$p")
-    if [ ! -d "$p_exp" ]; then
-      echo "SETUP_FAIL dir-fixture[$idx] $p_exp missing — scenario author must prepare fixture in advance" >&2
-      exit 1
-    fi
-    if [ -d "$p_exp/.git" ] && git -C "$p_exp" rev-parse --verify scenario-start >/dev/null 2>&1; then
-      git -C "$p_exp" reset --hard scenario-start >/dev/null
-      git -C "$p_exp" clean -fdx >/dev/null
-      echo "FOLDFIX[$idx]=$p_exp (reset to scenario-start)"
-    else
-      echo "FOLDFIX[$idx]=$p_exp (no git reset — not a repo or no tag)"
-    fi
-    idx=$((idx+1))
-  done <<< "$FOLDFIX"
+	idx=0
+	while IFS= read -r p; do
+		[ -z "$p" ] && continue
+		p_exp=$(expand_path "$p")
+		if [ ! -d "$p_exp" ]; then
+			echo "SETUP_FAIL dir-fixture[$idx] $p_exp missing — scenario author must prepare fixture in advance" >&2
+			exit 1
+		fi
+		if [ -d "$p_exp/.git" ] && git -C "$p_exp" rev-parse --verify scenario-start >/dev/null 2>&1; then
+			git -C "$p_exp" reset --hard scenario-start >/dev/null
+			git -C "$p_exp" clean -fdx >/dev/null
+			echo "FOLDFIX[$idx]=$p_exp (reset to scenario-start)"
+		else
+			echo "FOLDFIX[$idx]=$p_exp (no git reset — not a repo or no tag)"
+		fi
+		idx=$((idx + 1))
+	done <<<"$FOLDFIX"
 fi
 
 echo "SETUP_OK SCEN-$NNN"
