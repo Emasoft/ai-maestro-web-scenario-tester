@@ -51,7 +51,7 @@ Copy this checklist and track your progress:
 9. **REPORT-FORMAT** — Follow the structured markdown template with frontmatter, steps, bugs, verification.
 10. **PHOTOSTORY** — Every step screenshot in timestamped dir+filename, JPEG 97%, never compress mid-session; auto-purge after a verified-fixed PASS.
 11. **11th-HOUR** — Deep analysis + improvement proposals. This is the primary deliverable.
-12. **SUDO-MODE** — Destructive ops may trigger a re-authentication prompt. Re-enter the credential and confirm.
+12. **SUDO-MODE** — Destructive ops may trigger a re-authentication prompt. Call the project's `<prefix>_sudo_modal` helper, which resolves the credential from `governancePasswordRef`; the password never passes through a model, so never type one and never write one into a scenario.
 13. **AUTONOMOUS-PROTOCOL** — How a long unattended overnight batch is structured (durable cron + idempotent state file + per-scenario heartbeat).
 14. **REPORTS-TO-PROJECT-ROOT** — Every report/proposal/screenshot/log resolves under the MAIN project-root `reports/` (never a worktree-local path).
 
