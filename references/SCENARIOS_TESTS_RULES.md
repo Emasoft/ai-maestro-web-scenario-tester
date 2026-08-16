@@ -543,9 +543,14 @@ prerequisites:                      # Conditions that must be true BEFORE Phase 
   - Governance password set
   - ai-maestro-plugins marketplace registered
   - <any scenario-specific requirements, e.g. "Codex CLI installed">
-governance_password: "<password>"   # The actual password value, in quotes.
-                                    # Every step that needs it must reference it
-                                    # verbatim — never write just "password".
+governance_password: "$MYAPP_TEST_PASSWORD"
+                                    # The env var NAME, never the value. A scenario
+                                    # file is committed and published; a literal here
+                                    # publishes the credential. See Rule 12's
+                                    # "THE PASSWORD NEVER PASSES THROUGH A MODEL".
+                                    # Prefer `governancePasswordRef` in
+                                    # scenarios.config.json (`env:` / `file:` /
+                                    # `keychain:`) and omit this field entirely.
 commit: <git-hash or TBD>          # Hash at time of writing. Updated after first run.
 author: <who wrote the scenario>    # (optional) Person or team name.
 # NOTE: `client` goes between `description` and `subsystems` (see above).
@@ -573,7 +578,7 @@ author: <who wrote the scenario>    # (optional) Person or team name.
 | `browser_stack` | string | yes | `dev-browser` per Rule 8. New scenarios MUST set this field. |
 | `required_tools` | list | no | Legacy chrome-devtools-mcp list from pre-2026-04-15 scenarios. Deprecated; do NOT add to new scenarios. |
 | `prerequisites` | list | yes | Testable conditions. Include CLI checks (e.g., `which codex`). |
-| `governance_password` | string | yes | Actual password in quotes. Referenced verbatim in steps. |
+| `governance_password` | string | yes | The env var **NAME** (`"$MYAPP_TEST_PASSWORD"`), never the value — a scenario file is committed and published. Steps name a helper; they never spell the credential. Better still: set `governancePasswordRef` in `scenarios.config.json` and omit this field. See Rule 12. |
 | `commit` | string | yes | Git hash or `TBD`. Updated after first successful run. |
 | `author` | string | no | Person or team. |
 
@@ -767,6 +772,43 @@ that don't carry a fresh `X-Sudo-Token` earned by re-entering the governance
 password within the last 60 seconds. The token is one-shot — it's consumed
 on the first request that uses it.
 
+### THE PASSWORD NEVER PASSES THROUGH A MODEL (hard invariant)
+
+**The credential is a secret. No scenario file, no report, no shell command, no
+agent prompt may ever contain its value.** It lives in exactly one place — the
+environment (or whatever `governancePasswordRef` in `scenarios.config.json`
+names) — and it travels **ref → shell variable → the helper's stdin**. The
+runner *names a helper*; it never sees, types, or handles the value.
+
+Concretely:
+
+- **A scenario writes the env var NAME, never the literal.** In frontmatter:
+  `governance_password: "$MYAPP_TEST_PASSWORD"`. Better still, set
+  `governancePasswordRef` in `scenarios.config.json` and omit the field —
+  `scenarios.config.README.md` already specifies it as *"A REFERENCE to the test
+  login/sudo password — never the literal secret."*
+- **A step never instructs the runner to type the password.** It says *"call
+  `<prefix>_sudo_modal`"*. If a step's Action spells a credential, that step is a
+  bug: rewrite it to call the helper.
+- **The helper resolves the ref itself, or is handed a shell VARIABLE** — never a
+  literal on a command line, where it would land in shell history and in the run
+  log.
+- **If the ref resolves to nothing, the run FAILS FAST.** No default, no
+  placeholder. A default would be a secret in a committed file, which is the
+  exact bug this rule exists to prevent.
+
+**Why this is a hard invariant and not a preference.** The example in this very
+section used to spell a real governance password inline, and the frontmatter spec
+above it *mandated* `# The actual password value, in quotes`. Two docs in this
+repo then said opposite things — `scenarios.config.README.md` said "never the
+literal secret" while this file required one — and the file scenario authors copy
+from was the one requiring the literal. In the upstream project that mandate put
+**197 copies of a live credential across 34 committed files**, and a publish then
+carried it into a PUBLIC plugin repo. Nobody decided to leak it; the documented
+format required them to. A secret that any file is *permitted* to name will
+eventually appear in every file that *can* name it, so the only durable fix is to
+make naming it impossible.
+
 ### What this means for scenarios
 
 Whenever a scenario step performs a destructive operation (delete agent,
@@ -783,9 +825,9 @@ Any step that hits a strict operation MUST also include a
 **password re-entry sub-step** in its action list:
 
 > **Action:** Click "Delete Agent" in the Danger Zone. When the sudo
-> password modal appears, enter the governance password
-> `mYkri1-xoxrap-gogtan` and click Confirm. Then type the agent name
-> in the confirmation field and click Delete Forever.
+> password modal appears, call the project's sudo-modal helper
+> (`<prefix>_sudo_modal`), which resolves the credential itself. Then type
+> the agent name in the confirmation field and click Delete Forever.
 
 If the scenario does NOT show the sudo modal appearing, that is a BUG
 (Rule 4: fix it immediately) — either the caller is not using sudoFetch,
