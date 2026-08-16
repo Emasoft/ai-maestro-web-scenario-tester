@@ -617,7 +617,7 @@ Steps are numbered sequentially across all phases: S001, S002, ... S028. Never r
 
 | Field | Required | Content |
 |-------|----------|---------|
-| `Action` | yes | Exact UI sequence. Spell out button labels, input values, passwords. Never write "enter password" — write `enter password \`mYkri1-xoxrap-gogtan\``. |
+| `Action` | yes | Exact UI sequence. Spell out button labels and input values. **Never spell a credential** — name the helper that resolves it (`<prefix>_sudo_modal`), per Rule 12's hard invariant. A step that tells the runner to type a password is a bug. |
 | `Goal` | yes | Single verifiable assertion. Not a wish — a testable fact. |
 | `Creates` | yes | List of artifacts created, or `nothing`. Include where (registry, filesystem, tmux). |
 | `Modifies` | yes | List of state changes, or `nothing`. Be specific (field names, file paths). |
