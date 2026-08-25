@@ -1610,13 +1610,18 @@ def detect_bump_type(root: Path) -> str:
 def stage_changelog(root: Path, new_ver: str, dry_run: bool) -> None:
     """Step 9: Generate CHANGELOG.md with git-cliff using the bumped tag.
 
-    Uses the git-cliff pattern recommended for release pipelines:
-        git cliff --bump --unreleased --tag v<NEXT> -o CHANGELOG.md
+    Uses the history-preserving release pattern:
+        git cliff --bump --unreleased --tag v<NEXT> --prepend CHANGELOG.md
 
     --bump          promote the unreleased section into a dated tag entry
     --unreleased    process only commits since the last tag
     --tag v<NEXT>   label the new entry with the computed version (prefixed v)
-    -o CHANGELOG.md write the regenerated changelog back to disk
+    --prepend       insert ONLY the new section at the top, keeping prior ones
+
+    Must NOT be `-o CHANGELOG.md`: combined with --unreleased that REWRITES the
+    whole file with just the new section, silently erasing every earlier
+    release at exit 0 — it destroyed the 0.1.1/0.1.2 history at the v0.1.3
+    publish (same defect as CPV canon, memory ATOM-HIW7-4XEQ).
     """
     cprint(f"\n{BOLD}[9/11] Generating changelog (git-cliff)...{NC}")
     if not shutil.which("git-cliff"):
@@ -1628,10 +1633,10 @@ def stage_changelog(root: Path, new_ver: str, dry_run: bool) -> None:
         return
     tag = f"v{new_ver}"
     if dry_run:
-        cprint(f"  Would run: git-cliff --bump --unreleased --tag {tag} -o CHANGELOG.md")
+        cprint(f"  Would run: git-cliff --bump --unreleased --tag {tag} --prepend CHANGELOG.md")
         return
     run(
-        ["git-cliff", "--bump", "--unreleased", "--tag", tag, "-o", "CHANGELOG.md"],
+        ["git-cliff", "--bump", "--unreleased", "--tag", tag, "--prepend", "CHANGELOG.md"],
         cwd=root,
     )
     cprint(f"  {GREEN}CHANGELOG.md updated with {tag}.{NC}")

@@ -1,5 +1,7 @@
 /reports/
 /reports_dev/
+# Janitor per-session detector state + logs — regeneratable, never committed
+/.janitor/
 .DS_Store
 node_modules/
 .venv/
