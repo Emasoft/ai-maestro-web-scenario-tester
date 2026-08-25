@@ -1,12 +1,68 @@
 #!/usr/bin/env bash
-# Pre-push hook — delegates to publish.py --gate for all quality checks.
-# Follows the PSS (perfect-skill-suggester) pattern: one script, two modes.
+# Pre-push hook — branch-aware (CPV canon issue #169 semantics, hub TRDD 6WTIA4ZT),
+# adapted to this repo's publish.py-gate architecture (no validate_plugin.py here).
+#   feature-branch-only push  → trufflehog secret scan of the new commits, then allow
+#   default-branch / tag push → full release gate via scripts/publish.py --gate
+# The old hook gated EVERY push through publish.py --gate, which refuses anything
+# not descended from publish.py — so feature branches could never be pushed at all.
 set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
+
+ZERO=0000000000000000000000000000000000000000
+default_branch=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | awk -F/ '{print $NF}') || true
+
+# Stdin: one "LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA" line per pushed ref.
+release=0
+feature_refs=()
+while read -r local_ref local_sha _remote_ref remote_sha; do
+  [ -z "${local_ref:-}" ] && continue
+  [ "$local_sha" = "$ZERO" ] && continue   # deletion — nothing to gate or scan
+  case "$local_ref" in
+    refs/tags/*) release=1 ;;
+    refs/heads/*)
+      name=${local_ref#refs/heads/}
+      # main/master are ALWAYS release branches, plus whatever origin/HEAD says.
+      if [ "$name" = "main" ] || [ "$name" = "master" ] || [ "$name" = "${default_branch:-}" ]; then
+        release=1
+      else
+        feature_refs+=("$name $remote_sha")
+      fi ;;
+  esac
+done
+
+if [ "$release" -eq 0 ] && [ "${#feature_refs[@]}" -gt 0 ]; then
+  # Feature-branch-only push: publish.py ancestry NOT required (that gate is for
+  # releases) — but it MUST NOT leak a secret. Fail-closed: an unscanned push is
+  # never silently allowed.
+  if ! command -v trufflehog >/dev/null 2>&1; then
+    echo "BLOCKED: trufflehog is not installed — a feature-branch push must be secret-scanned first." >&2
+    exit 1
+  fi
+  for fr in "${feature_refs[@]}"; do
+    name=${fr% *}; remote_sha=${fr##* }
+    # Scan ONLY the new commits: from the remote tip, or the default-branch tip
+    # for a brand-new branch (avoids re-scanning already-pushed history).
+    base=""
+    if [ "$remote_sha" != "$ZERO" ]; then
+      base="$remote_sha"
+    elif [ -n "${default_branch:-}" ]; then
+      base=$(git rev-parse --verify --quiet "origin/$default_branch" || true)
+    fi
+    cmd=(trufflehog git "file://$REPO_ROOT" --branch "$name" --no-update --fail)
+    [ -n "$base" ] && cmd+=(--since-commit "$base")
+    if ! "${cmd[@]}"; then
+      echo "BLOCKED: secret scan flagged '$name' — remove the secret(s) before pushing." >&2
+      exit 1
+    fi
+  done
+  echo "Secret scan clean — feature-branch push allowed."
+  exit 0
+fi
+
+# Release path (default branch, tags, or an empty/unparseable push): full gate.
 if command -v uv &> /dev/null; then
     uv run python scripts/publish.py --gate
 else
     python3 scripts/publish.py --gate
 fi
-exit $?
