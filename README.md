@@ -3,7 +3,7 @@
 <!--BADGES-START-->
 [![CI](https://github.com/Emasoft/ai-maestro-web-scenario-tester/actions/workflows/ci.yml/badge.svg)](https://github.com/Emasoft/ai-maestro-web-scenario-tester/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-0.1.3-blue)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 <!--BADGES-END-->
 
 A Claude Code **role-plugin** that turns Claude into a browser-driven UI
