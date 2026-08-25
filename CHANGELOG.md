@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] — 2026-08-25
+
+### Bug Fixes
+
+- **hooks:** Branch-aware pre-push — allow secret-scanned feature pushes (6WTIA4ZT) (dd966ca)
+- **publish:** Git-cliff --prepend instead of -o — stop erasing changelog history (5856fd7)
+- **lint:** Drop unused 'monkeypatch' from cspell words — cleared CPV MAJOR (d21ee29)
+
+### Documentation
+
+- Refuse TRDD-KYWZN17D — GHCFG finding already cleared (d0d7132)
+
+### Miscellaneous Tasks
+
+- Land pending lint configs and README badge restyle (a2e1913)
 ## [0.1.3] — 2026-07-08
 
 ### Bug Fixes
