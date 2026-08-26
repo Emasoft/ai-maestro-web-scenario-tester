@@ -59,11 +59,21 @@ validated**. A purely relative escape is NOT blocked. Measured by piping hook
 payloads straight into `scripts/amwst_subagent-write-guard.sh` with the sentinel
 present:
 
-| Probe | Result |
+| Probe | Observed |
 |---|---|
-| `Write` → `<project>/../ESCAPED.txt` | **exit 2 — BLOCKED** ✅ |
-| `Write` → in-project path (control) | exit 0 — allowed ✅ |
-| `Bash` → `cd ../.. && echo pwned > ESCAPED2.txt` | **exit 0 — ALLOWED** ❌ |
+| `Write` → `<project>/../ESCAPED.txt` | **exit 2 — guard BLOCKED it** ✅ |
+| `Write` → in-project path (control) | exit 0 — guard did not block ✅ |
+| `Bash` → `cd ../.. && echo pwned > ESCAPED2.txt` | **exit 0 — guard did NOT block** ❌ |
+
+Read that table as written: it records what the **guard script** did with each
+payload, not what the harness ultimately permitted, and no probe executed the
+escape — `ESCAPED2.txt` was never created, because the payload is a JSON string
+describing a command nobody ran. The script implements the exit-status contract
+(`block()` writes plain text to stderr and exits 2; there is no
+`permissionDecision` JSON on stdout anywhere in the file), so exit 0 does mean
+"no objection raised" — but the claim proven here is precisely "the guard does
+not object to a relative-path Bash escape", which is the claim that matters for
+whether the Bash half can be relied on.
 
 So the Write/Edit half of the guard is proven to work, and the Bash half stops
 only the *absolute-path* form of the escape. The script's own comment names
