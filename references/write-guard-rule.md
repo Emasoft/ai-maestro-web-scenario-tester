@@ -18,10 +18,22 @@ Reads may go anywhere. Writes are restricted to the roots above. No exceptions.
 
 ## Why this rule exists
 
-`isolation: worktree` provides **filesystem isolation only** — each worktree is
-a separate git checkout. It does **NOT** provide process sandboxing. A subagent
-with `Bash`, `Write`, and `Edit` tools can walk out of its worktree with a
+`isolation: worktree` provides **filesystem isolation** — each worktree is a
+separate git checkout. Historically it did **not** constrain the tools: a
+subagent with `Bash`, `Write`, and `Edit` could walk out of its worktree with a
 simple `cd ../..` and corrupt the parent repo.
+
+**Claude Code 2.1.222 closed that specific escape** — worktree isolation now
+applies to file edits and Bash in every session type, so a worktree-isolated
+subagent can no longer run destructive git commands against the main checkout.
+The guard is NOT redundant, because it covers what that fix does not:
+
+- **Runs that are not worktree-isolated at all.** A scenario batch executing in
+  the main checkout gets no isolation from the CLI; the guard is the only limit.
+- **The project's own allowlist.** `scenarios.config.json` → `writeGuardAllowlist`
+  is a per-project policy the CLI knows nothing about.
+- **Defense in depth.** The upstream fix is one version's behavior; a guard that
+  fails closed does not depend on which CLI version the run happens to use.
 
 This was not hypothetical: an overnight scenario batch had an
 improvement-implementer subagent's destructive git command blocked by a global
