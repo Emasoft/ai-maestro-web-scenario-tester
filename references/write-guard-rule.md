@@ -23,10 +23,18 @@ separate git checkout. Historically it did **not** constrain the tools: a
 subagent with `Bash`, `Write`, and `Edit` could walk out of its worktree with a
 simple `cd ../..` and corrupt the parent repo.
 
-**Claude Code 2.1.222 closed that specific escape** — worktree isolation now
-applies to file edits and Bash in every session type, so a worktree-isolated
-subagent can no longer run destructive git commands against the main checkout.
-The guard is NOT redundant, because it covers what that fix does not:
+**Claude Code 2.1.222 narrowed this upstream.** Its changelog entry reads:
+"Fixed worktree-isolated sessions and their subagents being able to run
+destructive git commands against the main checkout; isolation now applies to
+file edits and Bash in every session type."
+
+**Treat that as narrowing, not closure.** The entry is ambiguous in the
+dimension that matters here: its first clause names *destructive git commands*,
+while its second could mean the isolation boundary is enforced for all edits and
+Bash. Nobody has tested which reading is correct against this repo, so **do not
+assume the `cd ../..` escape is dead** — and do not delete this guard on the
+strength of that sentence. The guard is unconditional, and it covers ground the
+upstream fix does not reach even under the generous reading:
 
 - **Runs that are not worktree-isolated at all.** A scenario batch executing in
   the main checkout gets no isolation from the CLI; the guard is the only limit.
