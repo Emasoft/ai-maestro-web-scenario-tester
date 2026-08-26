@@ -10,6 +10,7 @@ description: >-
 argument-hint: scenario-number-or-name [more numbers]
 disable-model-invocation: false
 context: fork
+background: false
 model: opus
 agent: web-scenario-tester-main-agent
 ---

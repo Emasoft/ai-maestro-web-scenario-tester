@@ -71,7 +71,7 @@ The skill itself documents the dev-browser CLI API — `browser.getPage`, `page.
 
 Every `dev-browser` invocation MUST use the standard flags from Rule 8: `--browser <browserInstance> --headless --timeout 60`, where `<browserInstance>` is read from `scenarios.config.json`. The reusable project DOM helpers live at the `helpersScript` path from the config.
 
-**chrome-devtools MCP tools are deprecated** for scenario runs — never load them (~30k context tokens of schemas; the dev-browser CLI gives you everything with zero MCP overhead). If a scenario's `required_tools` frontmatter still lists `mcp__chrome-devtools__*`, treat that as an authoring bug: rewrite those steps to dev-browser or mark the scenario DEFERRED with a clear reason. You already have Bash, Read, Write, Edit, Grep, Glob, TodoWrite from subagent defaults.
+**chrome-devtools MCP tools are deprecated** for scenario runs — never load them (~30k context tokens of schemas; the dev-browser CLI gives you everything with zero MCP overhead). If a scenario's `required_tools` frontmatter still lists `mcp__chrome-devtools__*`, treat that as an authoring bug: rewrite those steps to dev-browser or mark the scenario DEFERRED with a clear reason. You already have Bash, Read, Write, Edit, Grep, Glob from subagent defaults.
 
 ## Hard rules
 

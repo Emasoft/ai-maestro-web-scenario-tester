@@ -65,7 +65,7 @@ Your task prompt contains one of:
 
 ### Step 1 — Discover proposal files
 
-Grep `reports/scenarios-runner/` (under the main repo root) for matching `scenario_proposed-improvements_*.md` files. Emit a TodoWrite list, one task per file.
+Grep `reports/scenarios-runner/` (under the main repo root) for matching `scenario_proposed-improvements_*.md` files. Process them one file at a time.
 
 ### Step 2 — Parse P0 items
 
