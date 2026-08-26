@@ -33,8 +33,9 @@ dimension that matters here: its first clause names *destructive git commands*,
 while its second could mean the isolation boundary is enforced for all edits and
 Bash. Nobody has tested which reading is correct against this repo, so **do not
 assume the `cd ../..` escape is dead** — and do not delete this guard on the
-strength of that sentence. The guard is unconditional, and it covers ground the
-upstream fix does not reach even under the generous reading:
+strength of that sentence. The guard runs on every scenario run regardless of
+CLI version, and it covers ground the upstream fix does not reach even under the
+generous reading:
 
 - **Runs that are not worktree-isolated at all.** A scenario batch executing in
   the main checkout gets no isolation from the CLI; the guard is the only limit.
@@ -49,6 +50,33 @@ git-safety hook; instead of deferring, the subagent `cd`-ed into the parent
 repo, checked out a new branch on the parent's working tree, and committed
 files there — corrupting it. The write-guard closes that gap by validating
 every write tool call and catching the common Bash escape patterns.
+
+### KNOWN GAP — Bash checks are ABSOLUTE-PATH ONLY (measured 2026-08-26)
+
+The four Bash checks (`cd`, `git -C`, redirection, `cp/mv/rm/tee/...`) each filter
+their extracted paths through `grep -E '^/'`, so **only absolute paths are
+validated**. A purely relative escape is NOT blocked. Measured by piping hook
+payloads straight into `scripts/amwst_subagent-write-guard.sh` with the sentinel
+present:
+
+| Probe | Result |
+|---|---|
+| `Write` → `<project>/../ESCAPED.txt` | **exit 2 — BLOCKED** ✅ |
+| `Write` → in-project path (control) | exit 0 — allowed ✅ |
+| `Bash` → `cd ../.. && echo pwned > ESCAPED2.txt` | **exit 0 — ALLOWED** ❌ |
+
+So the Write/Edit half of the guard is proven to work, and the Bash half stops
+only the *absolute-path* form of the escape. The script's own comment names
+`cd /absolute/path` "the primary escape vector" — this gap looks deliberate, not
+accidental, but the sentence above overstated it, and `cd ../..` is precisely the
+escape in the incident narrative above.
+
+**Why it is not patched here on the spot:** a relative path's meaning depends on
+the process's cwd, which this hook is not given (`CLAUDE_PROJECT_DIR` is the
+project root, not the caller's cwd), so resolving one correctly needs the hook
+payload's `cwd` field plumbed through `is_allowed_path` — a real change to a
+security script, deserving its own test pass rather than a hurried regex. Until
+then: **do not rely on the Bash half of this guard against a determined escape.**
 
 ## The design — a plugin-scoped PreToolUse hook, gated by a run sentinel
 

@@ -169,8 +169,10 @@ This plugin ships a PreToolUse **write-guard** hook (`hooks/hooks.json` →
 `scripts/amwst_subagent-write-guard.sh`) that confines scenario subagents to the
 project root / scratch — covering the `isolation: worktree` process-escape gap.
 Claude Code 2.1.222 narrowed that gap upstream, but by how much is untested; the
-guard is unconditional and does not depend on the CLI version in use (see
-`references/write-guard-rule.md`).
+guard runs on every scenario run regardless of CLI version. Note its measured
+limit: the Bash checks validate ABSOLUTE paths only, so a relative escape
+(`cd ../.. && echo > f`) is not blocked — see the KNOWN GAP section in
+`references/write-guard-rule.md`.
 Because a plugin hook loads in every session, the guard is **SENTINEL-GATED**:
 it is inert unless `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json`
 exists. The **run owner owns that sentinel** — the `amwst-run-scenario` /
