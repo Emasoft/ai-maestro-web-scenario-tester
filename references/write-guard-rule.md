@@ -51,7 +51,33 @@ repo, checked out a new branch on the parent's working tree, and committed
 files there — corrupting it. The write-guard closes that gap by validating
 every write tool call and catching the common Bash escape patterns.
 
-### KNOWN GAP — Bash checks are ABSOLUTE-PATH ONLY (measured 2026-08-26)
+### CLOSED 2026-08-27 — Bash checks now cover RELATIVE paths too
+
+The gap recorded below was **fixed**: all four Bash checks (`cd`, redirection,
+`cp/mv/ln/install` destination, and the `rm/mkdir/touch/tee/chmod/dd/sed -i` token
+scan) now resolve relative paths against the hook payload's `cwd` before calling
+`is_allowed_path`, instead of dropping them via `grep -E '^/'`.
+
+- `resolve_against_cwd` — absolute/`~` pass through; relative is resolved against
+  `HOOK_CWD` (from `json_field cwd`). If `cwd` is absent it returns 1 and the caller
+  **blocks** — "cannot verify" is treated as forbidden, matching `is_allowed_path`'s
+  own empty-is-forbidden rule.
+- `looks_like_path` — only absolute, `~`-rooted or slash-bearing tokens are checked, so
+  widening the token scan does not turn every bare argument (`-rf`, `pwned`) into a
+  false block.
+
+Verified with an 11-case probe suite (payloads piped straight to the script):
+**blocked** `cd ../.. && echo > f`, `echo x > ../../f`, `rm ../../important`,
+`cp a ../../dest`, `cd /etc`; **allowed** `cd scripts && ls`, `echo x > reports/x.txt`,
+`rm -rf .pytest_cache`, `git status`, `cd /tmp`, and an in-project `Write`.
+
+**Residual ceiling (deliberate):** resolution is per-token against the payload `cwd`, NOT
+a per-segment shell interpreter — `cd a && cd b` resolves both against `cwd`, not `b`
+against `cwd/a`. Chained relative `cd`s that stay inside the allowlist are unaffected;
+an escaping chain still trips on its first escaping segment. Upgrade to per-segment cwd
+tracking only if a real command shape defeats this.
+
+### The original gap — Bash checks were ABSOLUTE-PATH ONLY (measured 2026-08-26)
 
 The four Bash checks (`cd`, `git -C`, redirection, `cp/mv/rm/tee/...`) each filter
 their extracted paths through `grep -E '^/'`, so **only absolute paths are

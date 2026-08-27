@@ -79,6 +79,11 @@ PYEOF
 }
 
 TOOL_NAME=$(json_field tool_name)
+# The caller's working directory, from the hook payload. Needed because a RELATIVE
+# path in a Bash command means "relative to the caller's cwd" — resolving it against
+# this process's cwd (what `realpath -m` does by default) would check the wrong path.
+# Empty when absent: resolve_against_cwd then refuses to resolve, and the caller blocks.
+HOOK_CWD=$(json_field cwd)
 
 # Resolve the project root (CLAUDE_PROJECT_DIR points at the agent's working
 # tree — main tree for runner, worktree dir for implementer).
@@ -131,6 +136,34 @@ normalize_path() {
 	else
 		echo "$path"
 	fi
+}
+
+# Resolve ONE extracted path token to an absolute path for allowlist checking.
+# Absolute / `~` paths pass through unchanged; a RELATIVE path is resolved against the
+# payload's cwd, which is what the shell itself would do. Prints nothing and returns 1
+# when a relative path cannot be resolved (no cwd in the payload) — callers treat that
+# as "cannot verify" and BLOCK, matching is_allowed_path's own empty-is-forbidden rule.
+resolve_against_cwd() {
+	local raw="$1"
+	# shellcheck disable=SC2088  # '~' here are literal case-patterns, not expansions
+	case "$raw" in
+	/* | '~/'* | '~') normalize_path "$raw" ;;
+	*)
+		[ -z "$HOOK_CWD" ] && return 1
+		normalize_path "$HOOK_CWD/$raw"
+		;;
+	esac
+}
+
+# Is this token worth path-checking at all? Absolute, `~`-rooted, or containing a slash
+# (`../x`, `./x`, `a/b`). A bare word (`-rf`, `pwned`) is NOT a path and is skipped, so
+# widening the scans to relative paths does not turn every argument into a false block.
+looks_like_path() {
+	# shellcheck disable=SC2088  # '~' here is a literal case-pattern, not an expansion
+	case "$1" in
+	/* | '~'* | */* | . | ..) return 0 ;;
+	*) return 1 ;;
+	esac
 }
 
 is_allowed_path() {
@@ -260,15 +293,19 @@ Bash)
 	#   fi
 	# ──────────────────────────────────────────────────────────────────────
 
-	# 1. `cd /absolute/path` outside the allowlist — the primary escape vector.
+	# 1. `cd <path>` outside the allowlist — the primary escape vector. Covers BOTH
+	#    absolute paths and RELATIVE ones (`cd ../..`), the latter resolved against the
+	#    payload's cwd. Relative was unchecked until 2026-08-27 and was a live escape.
 	while IFS= read -r cd_path; do
 		[ -z "$cd_path" ] && continue
-		is_allowed_path "$cd_path" || block "Bash 'cd' to forbidden dir: $cd_path"
+		looks_like_path "$cd_path" || continue
+		resolved=$(resolve_against_cwd "$cd_path") ||
+			block "Bash 'cd' to unresolvable relative dir (no cwd in hook payload): $cd_path"
+		is_allowed_path "$resolved" || block "Bash 'cd' to forbidden dir: $cd_path -> $resolved"
 	done < <(
 		echo "$CMD_SCAN" |
 			grep -oE '(^|[[:space:]]|&&|\|\||;|\()[[:space:]]*cd[[:space:]]+[^[:space:]&|;()"'"'"']+' |
-			sed -E 's/^.*cd[[:space:]]+//' |
-			grep -E '^/' ||
+			sed -E 's/^.*cd[[:space:]]+//' ||
 			true
 	)
 
@@ -284,15 +321,18 @@ Bash)
 			true
 	)
 
-	# 3. File redirection `> /abs/path` / `>> /abs/path` outside the allowlist.
+	# 3. File redirection `> path` / `>> path` outside the allowlist — absolute AND
+	#    relative (`> ../../f`), the latter resolved against the payload's cwd.
 	while IFS= read -r redir_path; do
 		[ -z "$redir_path" ] && continue
-		is_allowed_path "$redir_path" || block "Bash redirection target: $redir_path"
+		looks_like_path "$redir_path" || continue
+		resolved=$(resolve_against_cwd "$redir_path") ||
+			block "Bash redirection to unresolvable relative path (no cwd in hook payload): $redir_path"
+		is_allowed_path "$resolved" || block "Bash redirection target: $redir_path -> $resolved"
 	done < <(
 		echo "$CMD_SCAN" |
-			grep -oE '[12]?>>?[[:space:]]*/[^[:space:]&|;()"'"'"']+' |
-			sed -E 's/^[12]?>>?[[:space:]]*//' |
-			grep -E '^/' ||
+			grep -oE '[12]?>>?[[:space:]]*[^[:space:]&|;()"'"'"'<>]+' |
+			sed -E 's/^[12]?>>?[[:space:]]*//' ||
 			true
 	)
 
@@ -316,12 +356,12 @@ Bash)
 				*) last_pos="$tok" ;;
 				esac
 			done
-			# shellcheck disable=SC2088  # '~/' here are literal case-patterns (a cp/mv/ln dest), not expansions
-			case "$last_pos" in
-			/* | '~/'* | '~')
-				is_allowed_path "$last_pos" || block "Bash cp/mv/ln/install destination outside allowed roots: $last_pos"
-				;;
-			esac
+			if looks_like_path "$last_pos"; then
+				resolved=$(resolve_against_cwd "$last_pos") ||
+					block "Bash cp/mv/ln/install destination unresolvable (no cwd in hook payload): $last_pos"
+				is_allowed_path "$resolved" ||
+					block "Bash cp/mv/ln/install destination outside allowed roots: $last_pos -> $resolved"
+			fi
 		fi
 	fi
 
@@ -329,16 +369,21 @@ Bash)
 	#     keep absolute-path tokens, reject any outside the allowlist).
 	if echo "$CMD_SCAN" | grep -qE '(^|[[:space:]]|&&|\|\||;|\()[[:space:]]*(rm|mkdir|touch|tee|chmod|chown|dd)([[:space:]]|$)' ||
 		echo "$CMD_SCAN" | grep -qE '(^|[[:space:]])sed[[:space:]]+-[a-zA-Z.]*i'; then
-		while IFS= read -r abs_path; do
-			[ -z "$abs_path" ] && continue
-			case "$abs_path" in
+		while IFS= read -r tok; do
+			[ -z "$tok" ] && continue
+			case "$tok" in
 			=* | --*) continue ;;
 			esac
-			is_allowed_path "$abs_path" || block "Bash write op references forbidden path: $abs_path"
+			# looks_like_path keeps absolute, ~-rooted and slash-bearing tokens
+			# (`../../f`) and drops bare words (`-rf`), so relative write targets are
+			# now checked without turning every argument into a false block.
+			looks_like_path "$tok" || continue
+			resolved=$(resolve_against_cwd "$tok") ||
+				block "Bash write op references unresolvable relative path (no cwd in hook payload): $tok"
+			is_allowed_path "$resolved" || block "Bash write op references forbidden path: $tok -> $resolved"
 		done < <(
 			echo "$CMD_SCAN" |
 				tr -s '[:space:]' '\n' |
-				grep -E '^/' |
 				sort -u ||
 				true
 		)
