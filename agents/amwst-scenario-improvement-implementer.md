@@ -2,6 +2,8 @@
 name: amwst-scenario-improvement-implementer
 description: Reads scenario_proposed-improvements_*.md files from reports/scenarios-runner/ and implements the P0 items in an isolated git worktree. Auto-detects the project's type-check and build commands (or reads them from tests/scenarios/scenarios.config.json). Commits each P0 item individually. Returns the worktree branch name and implemented/deferred counts so the parent session can merge on verification success or discard on failure. Use proactively after amwst-run-scenarios-batch completes a batch with --improve. Accumulates cross-run knowledge in project-scoped memory to avoid re-implementing the same proposals or re-tripping on the same deferral reasons.
 model: opus
+experimental:
+  cacheTtl: "1h"
 isolation: worktree
 memory: project
 skills:

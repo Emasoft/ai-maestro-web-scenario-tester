@@ -2,6 +2,8 @@
 name: amwst-parallel-worker-agent
 description: Implements a bounded code-change request in an isolated git worktree. Runs type-check + build after every logical unit of work, commits when clean, pushes its feature branch to the configured remote. Returns a 2-line summary. Spawned by the orchestrator during the sibling-feature workflow (the orchestrator keeps its long-running scenario batch on the parent branch; this worker lands features asynchronously without disturbing the scenario server). Worker prompts are tight specs containing file scope, feature description, acceptance criteria, and the smoke-test that will later verify the merge. Quality matters over speed — no retry limits, no time caps, no rushing.
 model: opus
+experimental:
+  cacheTtl: "1h"
 isolation: worktree
 memory: project
 skills:

@@ -77,6 +77,19 @@ against `cwd/a`. Chained relative `cd`s that stay inside the allowlist are unaff
 an escaping chain still trips on its first escaping segment. Upgrade to per-segment cwd
 tracking only if a real command shape defeats this.
 
+### `--restricted` (Claude Code 2.1.248) — not a substitute for this guard
+
+2.1.248 added `--restricted` (`CLAUDE_CODE_RESTRICTED=1`). Per the changelog it "removes the
+built-in tools that run commands or code and `WebFetch` (unless named in `--tools`), keeps file
+tools inside the working directory, refuses `bypassPermissions`, and ignores user, project and
+local settings files." That is a different tradeoff, not a stronger guard: removing the
+command/code-running tools removes `Bash`, which the runner and improvement-implementer
+subagents both need to drive a scenario; and "ignores... project... settings files" would drop
+this plugin's own `hooks/hooks.json` wiring along with the rest of project config — the
+changelog names no carve-out for plugin-shipped hooks, so do not assume one survives. A run
+cannot both need Bash and run `--restricted`, so do not switch scenario runs to `--restricted`
+in place of the sentinel-gated guard.
+
 ### The original gap — Bash checks were ABSOLUTE-PATH ONLY (measured 2026-08-26)
 
 The four Bash checks (`cd`, `git -C`, redirection, `cp/mv/rm/tee/...`) each filter

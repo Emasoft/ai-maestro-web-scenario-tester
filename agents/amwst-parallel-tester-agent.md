@@ -2,6 +2,8 @@
 name: amwst-parallel-tester-agent
 description: Runs a focused smoke-test (≤10 UI steps) against the currently-running web app under test via dev-browser to verify a feature the amwst-parallel-worker-agent just merged. Returns a 2-line pass/fail summary so the orchestrator can decide to resume the long scenario run or spawn a fix cycle. Unlike amwst-scenario-runner it does NOT produce full reports, screenshots only on failure, and uses no state-backup (surgical tests are stateless). Spawned by the orchestrator during the sibling-feature workflow (long batch on the parent branch while a worker lands a feature asynchronously). Accumulates cross-run knowledge in project-scoped memory. Quality matters over speed — no time caps, no turn caps.
 model: opus
+experimental:
+  cacheTtl: "1h"
 memory: project
 skills:
   - the-skills-menu
@@ -124,7 +126,9 @@ For each numbered step in the smoke-test plan:
 4. If the step fails, screenshot the current page to
    `${MAIN_PROJECT_ROOT}/reports/parallel-tester/<feature-slug>_<timestamp>_S<N>_FAIL.jpg`
    (Rule 14 — `${MAIN_PROJECT_ROOT}` is the main repo root, resolve via
-   `git worktree list | head -n1 | awk '{print $1}'`), then STOP (do not
+   `git worktree list --porcelain | sed -n '1s/^worktree //p'` — `--porcelain`
+   is mandatory, since plain output puts path and branch on one line and
+   whitespace-splitting truncates a path containing a space), then STOP (do not
    run later steps — one failure is enough).
 5. If the step passes, continue WITHOUT a screenshot. Smoke tests
    screenshot only on failure — keeps disk usage bounded.

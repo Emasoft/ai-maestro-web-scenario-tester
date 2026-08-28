@@ -232,7 +232,10 @@ repo root, never a worktree-local path):
 
 ```bash
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  MAIN_PROJECT_ROOT="$(git worktree list | head -n1 | awk '{print $1}')"
+  # --porcelain is mandatory: plain `git worktree list` puts the path and the
+  # branch on one line, so awk/cut on whitespace truncates any path containing
+  # a space (routine on macOS) and the report lands in a directory nobody reads.
+  MAIN_PROJECT_ROOT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 else
   MAIN_PROJECT_ROOT="$CLAUDE_PROJECT_DIR"
 fi

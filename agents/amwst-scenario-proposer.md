@@ -32,7 +32,7 @@ Follow it:
 5. Write `${MAIN_PROJECT_ROOT}/reports/scenarios-runner/scenario_proposed-improvements_NNN_<ts>.md` — each proposal P0-P3 with Problem / Root cause / Proposed fix (file:line) / Verification / Risk. Concise + DRY.
 6. Record any durable new pattern in your own project memory.
 
-Resolve `${MAIN_PROJECT_ROOT}` per Rule 14: `MAIN_PROJECT_ROOT="$(git worktree list | head -n1 | awk '{print $1}')"` (the MAIN repo root, never a worktree-local path).
+Resolve `${MAIN_PROJECT_ROOT}` per Rule 14: `MAIN_PROJECT_ROOT="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"` (the MAIN repo root, never a worktree-local path). `--porcelain` is mandatory — plain `git worktree list` puts the path and branch on one line, so splitting on whitespace truncates any path containing a space.
 
 ## Token discipline
 Your transcript is re-read every turn. Read the report ONCE; read scenario steps

@@ -2,6 +2,8 @@
 name: amwst-scenario-runner
 description: Executes ONE UI scenario end-to-end in its own isolated forked context. Reads the scenario file at ${CLAUDE_PROJECT_DIR}/tests/scenarios/SCEN-NNN_*.scen.md, follows the rules in SCENARIOS_TESTS_RULES.md, drives the app UI via the dev-browser plugin (loaded via the dev-browser:dev-browser skill — sandboxed JS scripts piped to the dev-browser CLI; persistent named pages across invocations), applies FIX-AS-YOU-GO for any bug it finds, and writes a structured report. The 11th-HOUR improvement proposals are produced by the SEPARATE amwst-scenario-proposer agent — not this one. Returns a 2-line summary. Invoked by the amwst-run-scenarios-batch skill OR directly by the user when they want to run one scenario. Accumulates cross-run knowledge in its project-scoped memory so repeated bug patterns are recognized instantly.
 model: opus
+experimental:
+  cacheTtl: "1h"
 memory: project
 skills:
   - the-skills-menu
