@@ -186,13 +186,12 @@ is_allowed_path() {
 
 	# 2. Scratch areas (cross-platform: macOS /private/tmp + /var/folders/*, Linux /tmp)
 	#    BOTH spellings of each macOS path are listed on purpose. normalize_path runs
-	#    `realpath -m`, which resolves the /var and /tmp symlinks: /tmp -> /private/tmp
-	#    and /var/folders/... -> /private/var/folders/... . Without the /private/var
-	#    line the /var/folders pattern is DEAD on macOS and every write to $TMPDIR —
-	#    i.e. mktemp -d, python tempfile, the default scratch — is blocked while the
-	#    block message still advertises /var/folders as allowed (measured 2026-08-29).
-	#    The unresolved spellings stay for the no-realpath fallback, where the raw
-	#    path is matched as typed.
+	#    `realpath -m`, which resolves the symlinks: /tmp/* -> /private/tmp/* and
+	#    /var/folders/* -> /private/var/folders/* . Without the /private/var/folders/*
+	#    arm that pattern is DEAD on macOS and every write to $TMPDIR — mktemp -d,
+	#    python tempfile, the default scratch — is blocked, while the block message
+	#    still advertises it as allowed (measured 2026-08-29). The unresolved
+	#    spellings stay for the no-realpath fallback, which matches the raw path.
 	case "$abs" in
 	/tmp | /tmp/*) return 0 ;;
 	/private/tmp | /private/tmp/*) return 0 ;;

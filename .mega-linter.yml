@@ -55,7 +55,7 @@ MARKDOWN_MARKDOWNLINT_FILTER_REGEX_EXCLUDE: 'CHANGELOG\.md'
 #     `python -O` strips them — nothing runs this suite with -O.
 #   - B404/B603/B607 subprocess: tests/test_write_guard.py exists to EXECUTE the
 #     write-guard shell script; driving a subprocess is the test, not a smell.
-#   - B108 hardcoded_tmp_directory: the /var/tmp fixture root is deliberate and
+#   - B108 hardcoded_tmp_directory: the `var/tmp` fixture root is deliberate and
 #     documented — it is the one scratch path the guard does NOT allow, which is
 #     what makes the escape tests meaningful.
 # This is not a gate being lowered to get a green run: bandit ALSO fails the

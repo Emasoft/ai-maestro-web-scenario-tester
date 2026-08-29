@@ -11,7 +11,7 @@ keeps the run-sentinel gitignored (done for you by `init-scenarios-folder.sh`).
 Every scenario subagent that does code modification can only WRITE inside:
 
 1. **Its own project root or git worktree** — `$CLAUDE_PROJECT_DIR`
-2. **System scratch** — `/tmp`, `/private/tmp`, `/var/folders/*`, `/private/var/folders/*` (for cloning/fixing auxiliary repos). Both spellings of each macOS root are listed on purpose: the guard matches after `realpath -m`, which resolves `/tmp` → `/private/tmp` and `/var/folders/…` → `/private/var/folders/…`, so a single unresolved spelling silently never matches.
+2. **System scratch** — `/tmp`, `/private/tmp`, `/var/folders/*`, `/private/var/folders/*` (for cloning/fixing auxiliary repos). Both spellings of each macOS root are listed on purpose: the guard matches after `realpath -m`, which resolves `/tmp` → `/private/tmp` and `/var/folders/*` → `/private/var/folders/*`, so a single unresolved spelling silently never matches.
 3. **Any extra roots** the project explicitly lists in `scenarios.config.json` → `writeGuardAllowlist`
 
 Reads may go anywhere. Writes are restricted to the roots above. No exceptions.
