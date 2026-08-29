@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.5] — 2026-08-29
+
+### Bug Fixes
+
+- Adapt to Claude Code 2.1.218/2.1.233 tool + skill-fork changes (b55bed0)
+- **write-guard:** Close the relative-path Bash escape (4494ace)
+- Adapt to Claude Code 2.1.248 + fix worktree-root path truncation (d449b5b)
+
+### Documentation
+
+- **write-guard:** 2.1.222 closed the worktree escape — fix stale rationale, keep the guard (980a8e5)
+- **write-guard:** Restore the hedge — 2.1.222 NARROWED the escape, closure untested (497b3a5)
+- **write-guard:** Record measured KNOWN GAP — Bash checks are absolute-path only (1213f8c)
+- **write-guard:** Say what was observed — 'guard did not block', not 'ALLOWED' (6878f08)
 ## [0.1.4] — 2026-08-25
 
 ### Bug Fixes
