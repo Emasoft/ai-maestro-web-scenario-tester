@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] — 2026-08-29
+
+### Bug Fixes
+
+- **write-guard:** Unblock macOS $TMPDIR — the `/var/folders/*` pattern was dead (8b94a30)
+- **lint:** Write scratch roots as glob patterns, not bare paths (fe4dfd0)
+
+### Documentation
+
+- **write-guard:** List both macOS spellings wherever the roots are documented (049475b)
+
+### Miscellaneous Tasks
+
+- **lint:** Make the CI Lint job green for the new test file (435e235)
 ## [0.1.5] — 2026-08-29
 
 ### Bug Fixes
