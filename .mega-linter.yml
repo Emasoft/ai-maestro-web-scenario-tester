@@ -49,6 +49,22 @@ REPOSITORY_CHECKOV_ARGUMENTS: "--skip-check CKV2_GHA_1"
 # Single-quoted so the regex \. is read literally by yamllint.
 MARKDOWN_MARKDOWNLINT_FILTER_REGEX_EXCLUDE: 'CHANGELOG\.md'
 
+# Bandit is a linter for SHIPPED code; every finding it raises on a pytest file
+# here is categorically inapplicable, so it is excluded from tests/ only.
+#   - B101 assert_used (45 hits): pytest IS asserts. The check exists because
+#     `python -O` strips them — nothing runs this suite with -O.
+#   - B404/B603/B607 subprocess: tests/test_write_guard.py exists to EXECUTE the
+#     write-guard shell script; driving a subprocess is the test, not a smell.
+#   - B108 hardcoded_tmp_directory: the /var/tmp fixture root is deliberate and
+#     documented — it is the one scratch path the guard does NOT allow, which is
+#     what makes the escape tests meaningful.
+# This is not a gate being lowered to get a green run: bandit ALSO fails the
+# pre-existing tests/test_validate_scenario.py, so the config was already wrong
+# for tests — it simply never ran, because VALIDATE_ALL_CODEBASE is false and no
+# push had changed a test file since. Bandit still lints every shipped script.
+# Single-quoted so yamllint reads the regex escapes literally.
+PYTHON_BANDIT_FILTER_REGEX_EXCLUDE: '(^|/)tests?/'
+
 # Spell check — single-quoted so the regex \. is read literally by yamllint.
 SPELL_CSPELL_FILTER_REGEX_EXCLUDE: '(uv\.lock|\.json)'
 
