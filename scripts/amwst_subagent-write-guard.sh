@@ -20,7 +20,7 @@
 #   Scenario subagents may only WRITE to:
 #     1. $CLAUDE_PROJECT_DIR — the project root (runner) or the subagent's
 #        git worktree (implementer, via isolation: worktree)
-#     2. System scratch — /tmp, /private/tmp, /var/folders/*
+#     2. System scratch — /tmp, /private/tmp, /var/folders/*, /private/var/folders/*
 #     3. Any extra roots listed in scenarios.config.json "writeGuardAllowlist"
 #   Reads are NOT restricted — subagents may read from anywhere.
 #
