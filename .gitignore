@@ -22,3 +22,14 @@ build/
 .coverage
 .pytest_cache/
 .ruff_cache/
+
+# Private classes the plain `.env` line above does not cover. A scenario run
+# writes credentials into per-env dotenv variants and drops logs in the tree,
+# so these are live leak paths, not hypotheticals.
+.env.*
+id_rsa*
+*.pem
+*.key
+*.log
+# /janitor-safe-delete staging — recoverable copies of deleted work, never committed
+.trashcan/
