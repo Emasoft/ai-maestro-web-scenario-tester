@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7] — 2026-08-29
+
+### Bug Fixes
+
+- **publish:** Make stage_changelog idempotent — a resumed publish duplicated the release section (2099afa)
+
+### Miscellaneous Tasks
+
+- Bump version to 0.1.6 (97af467)
 ## [0.1.6] — 2026-08-29
 
 ### Bug Fixes
