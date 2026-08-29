@@ -1632,6 +1632,19 @@ def stage_changelog(root: Path, new_ver: str, dry_run: bool) -> None:
         cprint(f"  {YELLOW}No cliff.toml — skipping changelog.{NC}")
         return
     tag = f"v{new_ver}"
+    changelog = root / "CHANGELOG.md"
+    # Idempotency (interrupted-publish recovery), to match steps 7 and 10.
+    # --prepend ALWAYS inserts, so re-running this stage after a failure later in
+    # the pipeline emits a SECOND `## [<ver>]` section for the same release. That
+    # is exactly what happened publishing v0.1.6: the push was rejected by the
+    # pre-push gate, and the retry shipped a changelog with a duplicated header.
+    # Every other mutating stage already guards for this; this one did not.
+    if changelog.is_file():
+        head = changelog.read_text(encoding="utf-8", errors="replace")[:4096]
+        if f"## [{new_ver}]" in head:
+            cprint(f"  {YELLOW}CHANGELOG.md already has a [{new_ver}] section — "
+                   f"skipping (interrupted-publish recovery).{NC}")
+            return
     if dry_run:
         cprint(f"  Would run: git-cliff --bump --unreleased --tag {tag} --prepend CHANGELOG.md")
         return
