@@ -63,9 +63,12 @@ on-page text — read ONE computed value with `getComputedStyle(el).<prop>` inst
 ## 7. Sudo / re-auth modals (Rule 12)
 A destructive op may pop a password modal (`role="dialog" aria-modal="true"`),
 possibly several times if the app uses one-shot tokens. For EACH occurrence: detect
-the dialog via the scoped snapshot, fill the scenario's `governance_password`
-(frontmatter), submit, wait for it to close. If the app under test has no such
-modal, skip this.
+the dialog via the scoped snapshot, then call the project's `<prefix>_sudo_modal`
+helper, which resolves the credential from `governancePasswordRef` (or from the env
+var the scenario's `governance_password` NAMES) and fills it. **You never handle the
+value** — Rule 12's hard invariant: the password never passes through a model, so a
+step that asks you to type one is a bug. Submit, wait for it to close. If the app
+under test has no such modal, skip this.
 
 ## On a step failure
 STOP and load `amwst-phase-fixasyougo` — do not continue past a broken step.

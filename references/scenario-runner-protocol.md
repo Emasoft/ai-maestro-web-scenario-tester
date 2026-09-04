@@ -202,9 +202,12 @@ If the app implements a sudo / re-auth layer, destructive operations may trigger
 a `role="dialog" aria-modal="true"` password modal, possibly multiple times in a
 cleanup batch (one-shot tokens). Process each occurrence by calling the
 project's sudo-modal helper from the `helpersScript` (the contract requires a
-`<prefix>_sudo_modal`-style helper), passing the credential from the scenario's
-`governance_password` frontmatter field (or `governancePasswordRef` from
-config). If the app has no such layer, this phase is a no-op.
+`<prefix>_sudo_modal`-style helper). The credential comes from
+`governancePasswordRef` in `scenarios.config.json` — or, failing that, from the env
+var the scenario's `governance_password` field NAMES. Resolve it into a shell
+variable and pass THAT; never a literal, and never one you typed yourself (Rule 12's
+hard invariant — the password never passes through a model). If the app has no such
+layer, this phase is a no-op.
 
 ## Phase F — CLEANUP (Rules 1, 2, 3)
 
