@@ -31,6 +31,9 @@ ALLOWED_PLACEHOLDERS = {"$MYAPP_TEST_PASSWORD"}
 # group(1) = optional open quote, group(2) = value up to the same quote or EOL.
 # A bare (unquoted) value matches with group(1) empty; a quoted one captures
 # the inner text, so the $VARNAME match sees the bare name either way.
+# NOTE this regex is comment-safe only ACCIDENTALLY: its [^\s'"] stop-class
+# drops everything after a whitespace-# comment. Do not widen the class to
+# include '#' — that would re-admit commented literals.
 PW_VALUE_RE = re.compile(r"""governance_password:\s*(['"])?([^\s'"]+)(?:\1)?""")
 ASSIGNED_PW_RE = re.compile(r"AIM_GOVERNANCE_PASSWORD=(\S+)")
 
@@ -92,6 +95,16 @@ def test_validator_accepts_env_var_name_with_trailing_comment():
          "## Phase CLEANUP\n\n#### S001: x\n- **Action:** x\n- **Goal:** x\n- **Verify:** x\n"
     errors, _ = _validator.validate(ok)
     assert not any("governance_password" in msg for _ln, msg in errors)
+
+
+def test_validator_flags_quoted_literal_with_trailing_comment():
+    """A QUOTED literal followed by a comment must still error (review round 3:
+    if the comment-strip logic ever inverts, only this test catches the hole reopening)."""
+    bad = "---\nnumber: 1\nname: x\nversion: \"1.0\"\ndescription: x\nclient: claude\n" \
+          "browser_stack: dev\ngovernance_password: \"hunter2\"  # x\n---\n\n" \
+          "## Phase CLEANUP\n\n#### S001: x\n- **Action:** x\n- **Goal:** x\n- **Verify:** x\n"
+    errors, _ = _validator.validate(bad)
+    assert any("governance_password" in msg for _ln, msg in errors)
 
 
 def test_validator_flags_quoted_literal_in_sweep_regex():
