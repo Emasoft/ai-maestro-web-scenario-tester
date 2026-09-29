@@ -81,6 +81,27 @@ Copy this checklist and track your progress:
 7. **master-cleanup — DISARM the write-guard:** delete `${CLAUDE_PROJECT_DIR}/.claude/scenario_is_running.json` (for autonomous batches `master-cleanup.sh` already does this first). Do it on every exit path — including an aborted batch after a failed preflight.
 8. Return a 3-line final summary.
 
+### Cleanup is the conductor's responsibility too (Rule 1)
+
+A runner that returns cleanly cleans up after itself. **You own the cases where it doesn't** — and
+those are the ones that leave litter:
+
+- **A runner returns `BLOCKED`/`STUCK`, or dies, or is rate-limited mid-run.** Before you mark that
+  scenario `pending` for a retry, run its cleanup: read the partial report's artifact ledger, then
+  delete every agent it created **through the UI Delete Agent pipeline** (never `rm -rf` a workdir —
+  that leaves the registry record, the persisted-session row, the tmux session, and the cemetery
+  entry behind, and the server can legitimately re-create the folder). A retry that inherits the
+  dead attempt's fleet is not a fresh run.
+- **The user stops the batch part-way.** Stop means stop *and clean* — run the master cleanup for
+  every scenario already dispatched. Do not leave a half-built fleet for "next time".
+- **At end of batch**, verify by absence before reporting done:
+  `ls ~/agents/`, `tmux list-sessions`, `jq -r '.[].name' ~/.aimaestro/agents/registry.json`,
+  `jq -r '.[].id' ~/.aimaestro/sessions.json`, `ls ~/.aimaestro/cemetery/`, and — for any repo the
+  fleet created — `gh repo list <owner> --limit 200 --json name -q '.[].name'`.
+
+Anything you could not remove goes in the batch summary **by name**, with why. An unreported
+leftover is invisible, and invisible leftovers accumulate across every future batch.
+
 ### Rules reference
 
 Canonical rules file: `${CLAUDE_PLUGIN_ROOT}/references/SCENARIOS_TESTS_RULES.md` (the bundled canonical copy of the 14 mandatory rules; Rule 13 = AUTONOMOUS-PROTOCOL, Rule 14 = REPORTS-TO-PROJECT-ROOT). A consuming project MAY override it at `${CLAUDE_PROJECT_DIR}/tests/scenarios/SCENARIOS_TESTS_RULES.md` — prefer the consumer copy when it exists, else the bundled one. Pass the resolved path into every subagent prompt.

@@ -110,6 +110,85 @@ The cleanup phase steps are numbered and verified just like test steps — they 
 
 **Verification:** After cleanup, take a screenshot and compare with the pre-test screenshot. The UI must look identical.
 
+### The debt is owed when the RUN ENDS — not when the last phase ends
+
+**A scenario that is stopped, interrupted, abandoned, rate-limited, crashed, or superseded still
+owes its full cleanup, and owes it AT THAT MOMENT.** "The last phase does the cleanup" is only the
+happy path; most runs that leave litter never reach their last phase. There is no exception —
+not "I'll clean it next run", not "the next batch will handle it", not "the user may want to
+inspect it" (ask, and if the answer is yes, say so IN THE REPORT and clean it the moment the
+inspection is done).
+
+Concretely, cleanup is mandatory in every one of these:
+
+| Situation | Who cleans, when |
+|---|---|
+| The scenario completes (PASS or FAIL) | the runner, in its last phase |
+| The USER stops the run mid-way | the runner, before it returns — a stop is not a pause |
+| The runner hits a blocker it cannot fix and returns `BLOCKED`/`STUCK`/`DEFERRED` | the runner, before returning |
+| The runner is rate-limited or its turn dies | the NEXT runner or the batch conductor, on stale-heartbeat recovery (Rule 13) — resetting a scenario to `pending` MUST clean its artifacts first, or the retry inherits half a fleet |
+| The batch is abandoned entirely | the conductor's master-cleanup phase |
+| You are a human or an orchestrator who NOTICES orphaned artifacts | you — right then. Finding litter is authorization to remove it. |
+
+**If you cannot clean up, you must SAY SO EXPLICITLY** in the report and in your return summary,
+naming every artifact left behind and why. Silence is the failure mode: an unmentioned leftover
+looks identical to a clean run, and that is how three SCEN-031 agents and a public GitHub repo
+survived 53 hours after the run stopped (2026-07-25).
+
+### Keep a live artifact ledger — you cannot delete what you never wrote down
+
+From step 1, maintain a running list of everything the run creates, and write it into the report
+**as you go**, not at the end (a run that dies never reaches the end). Each entry: what it is,
+where it lives, and the exact UI action that removes it. At minimum, track:
+
+- **agents** (name + id + workdir) — including auto-created ones you did not ask for, such as the
+  auto-COS spawned by CreateTeam
+- **teams and groups**
+- **tmux sessions**
+- **GitHub repos, forks, issues, PRs, and branches** the fleet creates — these are PUBLIC and
+  outlive the machine; a repo created by a test agent is a test artifact like any other
+- **files written outside `reports/`** — anything the agents wrote into a workdir you will delete
+  is gone with it, so copy out anything worth keeping BEFORE deleting (and say where you put it)
+- **config mutations** covered by `rewipe-list` (Rule 3)
+
+### Deleting an agent means deleting ALL of it — go through the pipeline, never by hand
+
+An agent is not a folder. Removing it touches the registry, the cemetery archive, team slots, the
+tmux session, the persisted-session store, AMP keys, AID tokens, governance requests, and the
+Claude transcript directory. That is exactly why the server exposes ONE all-in-one operation for
+it. **Always delete an agent through the UI (Profile → Advanced → Danger Zone → Delete Agent, with
+"Also delete agent folder" checked), which runs the `DeleteAgent` pipeline.**
+
+- **NEVER `rm -rf` an agent's folder** to "clean up". That removes the one visible piece and
+  leaves every invisible one — and the server, finding a record whose folder vanished, may
+  legitimately re-create the folder. On 2026-07-25 three hard-deleted agents kept regrowing
+  `~/agents/<name>/.claude/rules/` after every manual `rm -rf`, because a stale
+  `PersistedSession` row outlived them (the pipeline had no unpersist step; fixed as `DeleteAgent`
+  G05b). Manual deletion produced an infinite loop that looked like a haunting.
+- **A soft delete does NOT remove the folder.** `deleteFolder` is honored only on a HARD delete;
+  on a soft delete the flag is silently inert and the pipeline still reports success. If the
+  folder must go, hard-delete (the cemetery archive is written first, so it stays recoverable).
+- **Purge the cemetery entry too** (Settings → Cemetery → Purge), or the artifact merely moved.
+- If the pipeline leaves something behind, that is a **BUG in the pipeline** — fix it there
+  (Rule 4 FIX-AS-YOU-GO) so every future run benefits. Do not paper over it with a shell command.
+
+### Verify by absence, not by intention
+
+Cleanup is verified by looking, not by having clicked Delete. Before declaring a run clean, confirm
+all of these are empty of this run's artifacts:
+
+```bash
+ls ~/agents/                                                        # no run-specific workdirs
+tmux list-sessions 2>/dev/null                                      # no run-specific sessions
+jq -r '.[].name' ~/.aimaestro/agents/registry.json                  # registry (incl. tombstones)
+jq -r '.[].id'   ~/.aimaestro/sessions.json                         # persisted sessions
+ls ~/.aimaestro/cemetery/                                           # cemetery archives
+gh repo list <owner> --limit 200 --json name -q '.[].name'          # repos the fleet created
+```
+
+A leftover found here is not bookkeeping — it is a live agent record the server will keep acting
+on. Record the verification output in the report's Cleanup Verification table.
+
 ---
 
 ## Rule 2: 0-IMPACT
@@ -1238,14 +1317,14 @@ step=S<NNN>     # current step, when in phase_c
 |---|---|
 | Missing | Fresh start. Write initial heartbeat. Continue Phase B normally. |
 | Fresh (< 10 min old) | Another runner is alive for this scenario. Exit immediately with `[DUPLICATE-RUNNER-DETECTED]`. Do NOT touch state.json. |
-| Stale (≥ 10 min old) | Prior runner died. Per Rule 6, the prior run is INVALIDATED. Delete the stale heartbeat, log to `state/recovery.log`, restart from S001. Never "resume" mid-step. |
+| Stale (≥ 10 min old) | Prior runner died. Per Rule 6, the prior run is INVALIDATED. **FIRST run the Rule 1 cleanup for the dead run's artifacts** (read its partial report's artifact ledger; then sweep `~/agents/`, tmux, the registry, `sessions.json`, the cemetery, and any repo the fleet created) — a retry that inherits the previous attempt's agents is not a fresh run and will fail in ways that have nothing to do with the code. Then delete the stale heartbeat, log to `state/recovery.log`, and restart from S001. Never "resume" mid-step. |
 
 **Cron-side stale detection** (same algorithm, longer threshold so we don't fight the runner's own self-recovery):
 
 The autonomous cron prompt invokes `tests/scenarios/scripts/state-machine-tick.sh` first. That script reads the state file, scans for `status: in_progress` entries, and:
 
 1. If a heartbeat exists and is **fresh** (≤ 90 min default, configurable via `--stale-min`): emit `WAIT SCEN-NNN`. Cron leaves it alone.
-2. If a heartbeat exists and is **stale** (> 90 min): reset the entry to `pending`, increment `retries`, log to `state/recovery.log`, delete the heartbeat file. Next tick will dispatch a fresh runner.
+2. If a heartbeat exists and is **stale** (> 90 min): **clean up the dead run's artifacts first** (Rule 1 — the dispatched runner died mid-run, so nothing has cleaned up after it; a `pending` reset without cleanup hands the next runner a half-built fleet), then reset the entry to `pending`, increment `retries`, log to `state/recovery.log`, and delete the heartbeat file. Next tick will dispatch a fresh runner.
 3. If no heartbeat AND `started_at` is > 90 min ago: same recovery path (treat as crashed before initial heartbeat write).
 4. Else (no in_progress, pending list non-empty): emit `RUN SCEN-NNN` for the first pending. Cron dispatches.
 5. Else (no pending, no in_progress, phase=running): advance phase to `master_cleanup`, emit `CLEANUP`.

@@ -47,11 +47,62 @@ The phase map (the reference expands each):
 | C — Execute | One step at a time via `amwst-scenario-step.sh`, scoped snapshot, act, verify, clipped region screenshot, report row, heartbeat refresh | `amwst-phase-execute` |
 | D — FIX-AS-YOU-GO (Rule 4) | Stop at the broken step, diagnose scoped, fix the root cause, rebuild, retry the SAME step until pass | `amwst-phase-fixasyougo` |
 | E — Re-auth dialogs (Rule 12) | Each in-app credential dialog handled via the project's `helpersScript` dialog helper | — |
-| F — CLEANUP (Rules 1-3) | Scenario cleanup steps via the UI, then the cleanup script (SHA256-verified rewipe restore), post-test screenshot vs baseline | — |
+| F — CLEANUP (Rules 1-3) | Scenario cleanup steps via the UI, then the cleanup script (SHA256-verified rewipe restore), post-test screenshot vs baseline — and on EVERY exit path (BLOCKED, STUCK, DEFERRED, user-stop included) | — |
 | G — Report (Rules 9, 14) | Rule 9 structured report under the MAIN repo root's `reports/scenarios-runner/` | — |
 | H — Return | Clear the heartbeat (clean terminus only), emit the 2-line summary | — |
 
 If you hit a rate limit or context compaction mid-scenario, follow the reference's rate-limit resilience section: checkpoint the active run to `MEMORY.md` before the pause, resume from the recorded step after it, clear the entry on completion.
+
+### Cleanup is owed on EVERY exit path — not only the happy one
+
+**Whatever ends your run, you clean up before you return.** PASS, FAIL, PARTIAL, BLOCKED, STUCK,
+DEFERRED, "the user told me to stop", "I hit a wall I can't fix" — every one of them reaches Phase F
+first. Phase F is not the last phase of a *successful* scenario; it is the last thing *you* do,
+always. If you are about to return without having run it, you are about to leave litter.
+
+You are creating real, persistent, sometimes PUBLIC things — agents with tmux sessions and
+registry records, teams, GitHub repos. They do not expire. Three agents and a public repo from one
+stopped SCEN-031 run survived 53 hours until the user found them (2026-07-25); that is the failure
+this section exists to prevent.
+
+**Keep the artifact ledger from step 1.** Append to the report AS YOU CREATE each artifact, never
+at the end — a run that dies never reaches the end, and the next runner can only clean up what it
+can read. Track: agents (name + id + workdir, **including the auto-COS that CreateTeam spawns
+without being asked**), teams, groups, tmux sessions, GitHub repos/forks/issues/PRs/branches the
+fleet creates, and anything written outside `reports/` that is worth keeping (copy it out BEFORE
+deleting the workdir, and say where you put it).
+
+**Delete agents ONLY through the UI's Delete Agent pipeline** (Profile → Advanced → Danger Zone →
+Delete Agent, "Also delete agent folder" checked, then purge the Cemetery entry). An agent is not a
+folder: it also has a registry record, a persisted-session row, a tmux session, team slots, AMP
+keys, AID tokens, and a Claude transcript dir. The pipeline is the ONE operation that handles all
+of them.
+
+**NEVER `rm -rf ~/agents/<name>/`.** It deletes the one visible piece and leaves every invisible
+one — and the server, finding a record whose folder disappeared, can legitimately re-create it. On
+2026-07-25 three manually-`rm -rf`'d agents kept regrowing `~/agents/<name>/.claude/rules/` on a
+loop, because a stale `PersistedSession` row outlived them. If the pipeline leaves something
+behind, that is a **pipeline bug** — fix it there (Rule 4), never with a shell command.
+
+**Verify by absence before you return** — cleanup is proven by looking, not by having clicked:
+
+```bash
+ls ~/agents/ && tmux list-sessions 2>/dev/null
+jq -r '.[].name' ~/.aimaestro/agents/registry.json
+jq -r '.[].id'   ~/.aimaestro/sessions.json
+ls ~/.aimaestro/cemetery/
+```
+
+Put the output in the report's Cleanup Verification table. **If you genuinely cannot remove
+something, name it explicitly** — in the report AND in your Phase H return lines — with what it is,
+where it is, and why it survived. An unmentioned leftover is indistinguishable from a clean run,
+which is exactly how litter accumulates unnoticed across dozens of runs.
+
+**Return gate: you may not return until Phase F has run.** This holds for every terminus —
+including `BLOCKED`, `STUCK`, and a mid-run stop by the user. If some artifact could not be
+removed, the return lines must name it (see above), because the parent decides what to do next
+based only on these lines. Never return "I stopped early, someone else will clean up": there is no
+someone else.
 
 ## Token discipline (forked context is NOT free)
 
