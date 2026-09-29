@@ -1406,6 +1406,8 @@ STEP 6: Post-test screenshot
 
 **Every report, every proposal, every screenshot, every log that any agent, plugin, MCP tool, skill, hook, or subagent produces MUST be written under `<main-project-root>/reports/` — and NOWHERE ELSE.** No carve-outs. No per-tool exceptions. No worktree-local paths. No `reports_dev/<tool>/` fallbacks. No `/tmp/` landing zones. Even when running inside a git worktree or a plugin cache, output resolves to the MAIN project root's `reports/` folder.
 
+A scenario report is never converted into a TRDD/kanban card; if a finding needs a tracked task, the consumer project files it with `trddgrep new` (3-pillars governance, PRRD G2.1).
+
 ### The one-and-only path convention
 
 ```
