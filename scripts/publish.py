@@ -1476,6 +1476,143 @@ def _local_tag_exists(root: Path, tag: str) -> bool:
     return r.returncode == 0
 
 
+# Wall-clock budget for the RELEASE PUSH. The branch-aware pre-push hook runs
+# the whole gate — remote CPV validate plus the full test suite — INSIDE the
+# push's own clock, so the push is not a bare network transfer: budget the
+# gate's own work plus slack, and cap the attempt count (a 4-second bare
+# push's 60-attempt retry budget would re-run a dead gate 60 times; issue #224).
+_CPV_TIMEOUT_SEC = 600.0           # single budget for every uvx cpv-remote-validate call
+_DEFAULT_TEST_SUITE_TIMEOUT = 1800.0
+_PUSH_TIMEOUT_SEC = _CPV_TIMEOUT_SEC + 2 * _DEFAULT_TEST_SUITE_TIMEOUT + 1800.0
+_PUSH_MAX_ATTEMPTS = 3
+
+
+def _remote_tag_state(root: Path, tag: str) -> bool | None:
+    """Three-valued remote-tag probe.
+
+    True = ls-remote succeeded and the tag exists; False = succeeded and it
+    does not (a real answer); None = the remote could NOT be read. None is
+    deliberately DISTINCT from False: a caller about to act destructively
+    (move a tag) must REFUSE on None rather than treat an unanswered
+    question as "no tag".
+    """
+    try:
+        r = subprocess.run(
+            ["git", "ls-remote", "--tags", "origin", f"refs/tags/{tag}"],
+            capture_output=True, text=True, cwd=str(root),
+            check=False, timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    return bool(r.stdout.strip())
+
+
+def _remote_tag_exists(root: Path, tag: str) -> bool:
+    """True only on a POSITIVE remote answer, per `git ls-remote`.
+
+    Asks the REMOTE rather than trusting that the push stage ran: a push that
+    executed and silently failed its ref-update is otherwise indistinguishable
+    from one that worked, and the plugin then reports a green publish while
+    being undependable (ai-maestro#62 R3). Any failure to answer maps to
+    False here, so the post-push verify reports UNVERIFIED — never a false
+    green. A caller that would act DESTRUCTIVELY on "absent" must use
+    `_remote_tag_state` and refuse on None instead.
+    """
+    return _remote_tag_state(root, tag) is True
+
+
+def _plugin_name(root: Path) -> str | None:
+    """Read the plugin name from .claude-plugin/plugin.json (None if unreadable).
+
+    Unlike _read_plugin_name (marketplace-side, falls back to the directory
+    name), this returns None so tag/commit derivation can skip loudly instead
+    of inventing a name.
+    """
+    pj = root / ".claude-plugin" / "plugin.json"
+    if not pj.is_file():
+        return None
+    try:
+        data = json.loads(pj.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    name = data.get("name")
+    return str(name) if name else None
+
+
+def _dependency_tag_name(root: Path, new_ver: str) -> str | None:
+    """The `{plugin-name}--v{version}` tag Claude Code resolves dependencies against.
+
+    Since Claude Code 2.1.110 a version-constrained dependency
+    ({"name": "<plugin>", "version": ">=1.2"}) is resolved by listing this
+    repo's tags, keeping only those starting with "<plugin>--v", and fetching
+    the highest one satisfying the range. The plain vX.Y.Z tag is IGNORED by
+    that resolver, so a plugin shipping only vX.Y.Z cannot be depended upon:
+    every dependent fails to install with `no-matching-tag` and is DISABLED
+    (ai-maestro #1). NOTE the separator is a DOUBLE hyphen (`--v`); a single
+    `-v` does not match the resolver's prefix filter.
+
+    Derived from the manifest, never hardcoded, so renaming the plugin cannot
+    silently desync the tag from the plugin it names. Returns None when the
+    name is unreadable, in which case the caller warns and skips rather than
+    inventing a name.
+    """
+    name = _plugin_name(root)
+    return f"{name}--v{new_ver}" if name else None
+
+
+def _ensure_tag_at_head(root: Path, tag_name: str, message: str) -> bool:
+    """Guarantee `tag_name` exists AND points at HEAD, or refuse.
+
+    The old behaviour was "if it exists locally, skip". After a publish that
+    died between tagging and the push, the retry then pushed the PREVIOUS
+    attempt's tag — so every commit made between the attempts, typically the
+    very fix that made the retry pass, landed on the branch but OUTSIDE the
+    released tag, and the release archive differed from the tree the gates
+    had just validated.
+
+    FAIL-CLOSED. The tag is moved ONLY on the remote's POSITIVE answer that it
+    is unpushed. A tag already on origin is immutable here, and an unreachable
+    remote is not consent — an unanswered `ls-remote` must never be read as
+    "the tag is not published".
+
+    Returns True when the tag is correct (created, moved, or already at HEAD),
+    False when the caller must abort.
+    """
+    if not _local_tag_exists(root, tag_name):
+        run(["git", "tag", "-a", tag_name, "-m", message], cwd=root)
+        cprint(f"  {GREEN}Tag {tag_name} created.{NC}")
+        return True
+    tag_sha = run(["git", "rev-list", "-n", "1", tag_name], cwd=root,
+                  check=False, capture=True).stdout.strip()
+    head_sha = run(["git", "rev-parse", "HEAD"], cwd=root,
+                   check=False, capture=True).stdout.strip()
+    if not (tag_sha and head_sha) or tag_sha == head_sha:
+        # Already correct, or the shas are unreadable — the latter is the
+        # historical behaviour and is safe: nothing is moved on a guess.
+        cprint(f"  {GREEN}Tag {tag_name} already present at HEAD.{NC}")
+        return True
+    remote_state = _remote_tag_state(root, tag_name)
+    if remote_state is None:
+        cprint(f"  {RED}Local tag {tag_name} points at {tag_sha[:8]} (HEAD {head_sha[:8]}) "
+               f"and origin's tags cannot be read (ls-remote failed). REFUSING to move "
+               f"the tag — that is only safe when the remote confirms it is unpushed. "
+               f"Re-run once the remote is reachable.{NC}")
+        return False
+    if remote_state is True:
+        cprint(f"  {RED}Local tag {tag_name} points at {tag_sha[:8]} but HEAD is "
+               f"{head_sha[:8]}, and the tag is ALREADY ON ORIGIN. REFUSING to move a "
+               f"published tag. Bump to a new version instead.{NC}")
+        return False
+    cprint(f"  {YELLOW}Local tag {tag_name} points at {tag_sha[:8]}, HEAD is at "
+           f"{head_sha[:8]}. The tag is unpushed; deleting and recreating it at HEAD.{NC}")
+    run(["git", "tag", "-d", tag_name], cwd=root)
+    run(["git", "tag", "-a", tag_name, "-m", message], cwd=root)
+    cprint(f"  {GREEN}Tag {tag_name} re-created at HEAD.{NC}")
+    return True
+
+
 def stage_bump(root: Path, new_ver: str, dry_run: bool) -> None:
     """Step 7: Bump version. Idempotent — skips when local already matches target.
 
@@ -1659,8 +1796,9 @@ def stage_commit_and_push(root: Path, new_ver: str, dry_run: bool) -> None:
 
     Idempotency: if HEAD's subject is already `chore: bump version to <new_ver>`
     AND the working tree is clean, skip the commit step (interrupted-publish
-    recovery). If the tag already exists locally, skip the tag step. The push
-    always runs — that is what brings the remote into sync.
+    recovery). Tags route through _ensure_tag_at_head, which guarantees the
+    tag exists AND points at HEAD (never pushes a stale previous attempt's
+    tag), and is fail-closed on an unreachable remote.
 
     TRDD-bbff5bc5 §5: gh-auth precheck runs BEFORE the first push so the
     user gets an actionable error if their gh CLI is unauthed/lacks push
@@ -1668,10 +1806,20 @@ def stage_commit_and_push(root: Path, new_ver: str, dry_run: bool) -> None:
     """
     cprint(f"\n{BOLD}[10/11] Committing and pushing...{NC}")
     tag = f"v{new_ver}"
+    # The DEPENDENCY-RESOLUTION tag. Claude Code's version-constrained plugin
+    # dependency resolver lists this repo's tags, keeps only those starting
+    # with "<plugin>--v", and fetches the highest one satisfying the range;
+    # the plain vX.Y.Z tag is IGNORED. A release shipping only vX.Y.Z is
+    # unpinnable: every dependent fails with `no-matching-tag` (ai-maestro #1).
+    # Both tags are created and pushed in the SAME atomic push, so a release
+    # can never ship with one and not the other. Separator is a DOUBLE hyphen.
+    dep_tag = _dependency_tag_name(root, new_ver)
     expected_subject = f"chore: bump version to {new_ver}"
     head_subject = _head_commit_message(root)
     tree_clean = _git_porcelain_clean(root)
     tag_exists = _local_tag_exists(root, tag)
+    dep_tag_exists = dep_tag is not None and _local_tag_exists(root, dep_tag)
+    push_refs = ["HEAD", tag] + ([dep_tag] if dep_tag else [])
 
     if dry_run:
         if head_subject == expected_subject and tree_clean:
@@ -1682,7 +1830,13 @@ def stage_commit_and_push(root: Path, new_ver: str, dry_run: bool) -> None:
             cprint(f"  Would skip tag (already exists locally): {tag}")
         else:
             cprint(f"  Would tag: {tag}")
-        cprint(f"  Would push (atomic): origin HEAD {tag}")
+        if dep_tag is None:
+            cprint(f"  {YELLOW}Would SKIP the dependency tag - plugin name unreadable.{NC}")
+        elif dep_tag_exists:
+            cprint(f"  Would skip dependency tag (already exists locally): {dep_tag}")
+        else:
+            cprint(f"  Would tag (dependency resolution): {dep_tag}")
+        cprint(f"  Would push (atomic): origin {' '.join(push_refs)}")
         return
 
     if head_subject == expected_subject and tree_clean:
@@ -1692,27 +1846,64 @@ def stage_commit_and_push(root: Path, new_ver: str, dry_run: bool) -> None:
         run(["git", "add", "-A"], cwd=root)
         run(["git", "commit", "-m", expected_subject], cwd=root)
 
-    if tag_exists:
-        cprint(f"  {YELLOW}Tag {tag} already exists locally — skipping tag step.{NC}")
-    else:
-        run(["git", "tag", "-a", tag, "-m", f"Release {tag}"], cwd=root)
+    # Both tags route through _ensure_tag_at_head: "exists locally -> skip"
+    # pushed a PREVIOUS attempt's tag after an interrupted publish, so the
+    # released tag no longer pointed at the validated tree.
+    if not _ensure_tag_at_head(root, tag, f"Release {tag}"):
+        sys.exit(1)
+
+    if dep_tag is None:
+        # Warn loudly rather than silently omitting it: a silent skip is how
+        # this defect survives unnoticed across releases.
+        cprint(f"  {YELLOW}WARNING: cannot read the plugin name from "
+               f".claude-plugin/plugin.json - SKIPPING the dependency tag. Dependent "
+               f"plugins will fail to resolve this release with `no-matching-tag`.{NC}")
+    elif not _ensure_tag_at_head(root, dep_tag, f"{_plugin_name(root)} {new_ver}"):
+        sys.exit(1)
 
     # gh-auth precheck — fail fast with actionable error if gh missing/unauthed.
     owner, repo = _resolve_owner_repo(root)
     _ensure_gh_auth(owner, repo)
-    # Atomic push: commit + tag land together or not at all. Eliminates the
-    # half-published-state failure mode where `git push origin HEAD --tags`
-    # could push the commit, fail on the tag (rejected/network), and leave
-    # the remote with an unreleased commit + no tag. `--atomic` is a single
-    # transaction in the wire protocol; the server rolls back if any ref
-    # update fails. git_with_retry still wraps the call so transient
-    # network hiccups (4xx-class permanent errors fall through immediately).
-    cprint(f"  {BLUE}$ git push --atomic origin HEAD {tag}{NC}")
-    git_with_retry(
-        ["git", "push", "--atomic", "origin", "HEAD", tag],
-        cwd=str(root), capture_output=False,
-    )
-    cprint(f"  {GREEN}Pushed {tag} atomically.{NC}")
+    # Atomic push: commit + BOTH tags land together or not at all. Eliminates
+    # the half-published-state failure mode where the commit could land and a
+    # tag fail (rejected/network), leaving the remote with an unreleased
+    # commit. `--atomic` is a single transaction in the wire protocol; the
+    # server rolls back if any ref update fails. git_with_retry still wraps
+    # the call so transient network hiccups retry (4xx-class errors fall
+    # through immediately).
+    cprint(f"  {BLUE}$ git push --atomic origin {' '.join(push_refs)}{NC}")
+    # capture_output MUST stay True (the module default): the transient
+    # classifier reads result.stderr, and with capture_output=False stderr is
+    # None, so every failure is classified as permanent and the release push
+    # could never retry a network blip. Echo the captured stderr below so
+    # nothing is swallowed.
+    try:
+        _push_res = git_with_retry(
+            ["git", "push", "--atomic", "origin", *push_refs],
+            cwd=str(root),
+            timeout=_PUSH_TIMEOUT_SEC,
+            max_attempts=_PUSH_MAX_ATTEMPTS,
+        )
+    except subprocess.CalledProcessError as _push_exc:
+        if _push_exc.stderr:
+            print(_push_exc.stderr, file=sys.stderr, end="")
+        raise
+    if _push_res.stderr:
+        print(_push_res.stderr, file=sys.stderr, end="")
+    _pushed = tag if dep_tag is None else f"{tag} + {dep_tag}"
+    cprint(f"  {GREEN}Pushed {_pushed} atomically.{NC}")
+    # PROVE THE TAG, not the stage (ai-maestro#62 R3). A push stage that ran
+    # and silently failed its ref-update looks exactly like one that worked.
+    # The refs are already pushed by this point, so failing the run could not
+    # un-push them — an unverifiable tag is reported UNVERIFIED with the
+    # command to check it by hand.
+    for _verify_tag in (tag, *([dep_tag] if dep_tag else [])):
+        if _remote_tag_exists(root, _verify_tag):
+            cprint(f"  {GREEN}Verified on remote: {_verify_tag}{NC}")
+        else:
+            cprint(f"  {YELLOW}Could NOT verify {_verify_tag} on remote (ls-remote found "
+                   f"nothing, or the network was unreachable).{NC}")
+            cprint(f"  {YELLOW}  Check with: git ls-remote --tags origin '*{_verify_tag}'{NC}")
 
 def stage_gh_release(root: Path, new_ver: str, dry_run: bool) -> None:
     """Step 11: Create GitHub release via gh CLI.
