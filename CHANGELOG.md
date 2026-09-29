@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.10] — 2026-09-29
+
+### Bug Fixes
+
+- **validate:** Strip trailing YAML comments before the password dequote (review round 2) (f6e4285)
 ## [0.1.9] — 2026-09-29
 
 ### Bug Fixes
