@@ -389,7 +389,7 @@ wheels = [
 
 [[package]]
 name = "web-scenario-tester-scripts"
-version = "0.1.8"
+version = "0.1.9"
 source = { editable = "." }
 
 [package.optional-dependencies]

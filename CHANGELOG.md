@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.9] — 2026-09-29
+
+### Bug Fixes
+
+- **validate:** Close the unquoted-literal bypass in the password guard (review finding 1) (6713438)
+
+### Documentation
+
+- **design:** Persist the CPV pipeline recommendations in-tree (38b4549)
 ## [0.1.8] — 2026-09-29
 
 ### Bug Fixes
