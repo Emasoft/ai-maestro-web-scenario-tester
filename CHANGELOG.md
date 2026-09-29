@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] — 2026-09-29
+
+### Bug Fixes
+
+- **publish:** Create and push the {plugin}--v{version} resolver tag — dual-tag atomic release (17cc7a6)
+
+### Documentation
+
+- **rules:** Stop mandating the literal credential — name the ref, never the value ([#4](https://github.com/Emasoft/web-scenario-tester/issues/4)) (923e880)
+- **design:** Work spec for issues #2/#3 fixes + 3-pillars adoption (b336d28)
+- **agents:** Cite 3-pillars governance — reports are never TRDD cards (3857506)
+- **readme:** Rule 1 and Rule 12 rows match the amended rules (eb7e030)
+- **rules:** Rule 14 — a scenario report is never converted into a TRDD card (cd9ec69)
+- **rules:** Cleanup is owed when the RUN ends — every exit path, with verify-by-absence (e479c27)
+- **skill:** Amwst-validate-scenario lists the Rule-12 password guard (396eadd)
+- **design:** Scrub private paths from the work spec (CPV validator CRITICAL) (da7a8e4)
+
+### Features
+
+- **validate:** Rule-12 password guard — governance_password must carry an env-var NAME (c20bfa3)
 ## [0.1.7] — 2026-08-29
 
 ### Bug Fixes
