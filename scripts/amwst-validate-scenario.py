@@ -17,6 +17,7 @@ REQUIRED_FM = ["number", "name", "version", "description", "client", "browser_st
 RECOMMENDED_FM = ["device", "subsystems", "ui_sections", "prerequisites", "rewipe-list"]
 STEP_REQUIRED = ["Action", "Goal", "Verify"]
 STEP_RECOMMENDED = ["Creates", "Modifies"]
+ENV_VAR_NAME_RE = re.compile(r"^\$[A-Z_][A-Z0-9_]*$")
 
 
 def validate(text):
@@ -35,13 +36,15 @@ def validate(text):
                 break
         if not fm_end:
             errors.append((1, "frontmatter not closed (no second '---')"))
-        fm_keys, version_val = set(), None
+        fm_keys, version_val, gp_val = set(), None, None
         for i in range(1, fm_end or 1):
             m = re.match(r"^([A-Za-z0-9_-]+):(.*)$", lines[i])
             if m:
                 fm_keys.add(m.group(1))
                 if m.group(1) == "version":
                     version_val = m.group(2).strip()
+                elif m.group(1) == "governance_password":
+                    gp_val = m.group(2).strip()
         for k in REQUIRED_FM:
             if k not in fm_keys:
                 errors.append((None, f"frontmatter missing required key: {k}"))
@@ -50,6 +53,12 @@ def validate(text):
                 warns.append((None, f"frontmatter missing recommended key: {k}"))
         if version_val is not None and not version_val.startswith(('"', "'")):
             warns.append((None, 'version should be quoted (e.g. version: "1.0")'))
+        # Rule 12: the credential never passes through a model — the frontmatter carries the
+        # env var NAME, never a literal. A quoted literal is a leak waiting to be committed.
+        # Quoted values arrive with their quotes, so strip them before matching the $VARNAME shape.
+        if gp_val and gp_val[:1] in ('"', "'") and gp_val.endswith(gp_val[0]) \
+                and not ENV_VAR_NAME_RE.match(gp_val[1:-1]):
+            errors.append((None, 'governance_password must carry the env var NAME ("$MYAPP_TEST_PASSWORD"), never a literal credential — see Rule 12 (THE PASSWORD NEVER PASSES THROUGH A MODEL)'))
 
     body = lines[fm_end + 1:] if fm_end else lines
     body_off = fm_end + 1 if fm_end else 0
