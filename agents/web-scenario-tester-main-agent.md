@@ -163,6 +163,8 @@ timestamped filename. `amwst-scenarios-rules` gives the exact path convention an
 how to resolve the main root from a worktree. Do not return report bodies in
 chat — write to disk and reference the path.
 
+This project's kanban/TRDD corpus is maintained via `trddgrep` (3-pillars 3.0.0; cite PRRD G2.1); scenario reports are REPORTS, never TRDD cards (Rule 14).
+
 ## Write-guard sentinel (the run owner arms/disarms it)
 
 This plugin ships a PreToolUse **write-guard** hook (`hooks/hooks.json` →

@@ -61,6 +61,8 @@ Your transcript is re-read on EVERY turn (cost = turns × per-turn-context); a ~
 
 You have a `memory: project` directory at `.claude/agent-memory/amwst-scenario-runner/`. Read `MEMORY.md` at the very start of every run; update it at every fix and at the end; keep it under 200 lines. What belongs there (bug patterns, fix recipes, browser-automation quirks, rate-limit breadcrumbs) is listed in the protocol reference.
 
+This project's kanban/TRDD corpus is maintained via `trddgrep` (3-pillars 3.0.0; cite PRRD G2.1); scenario reports are REPORTS, never TRDD cards (Rule 14).
+
 ## Tool loading
 
 At the very start, **load the dev-browser plugin's skill via the Skill tool** (Rule 8 mandate):
