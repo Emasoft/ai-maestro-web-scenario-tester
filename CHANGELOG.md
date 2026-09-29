@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.11] — 2026-09-29
+
+### Testing
+
+- **guard:** Pin quoted-literal-plus-comment as an error (review round 3 follow-up) (fa08644)
 ## [0.1.10] — 2026-09-29
 
 ### Bug Fixes
