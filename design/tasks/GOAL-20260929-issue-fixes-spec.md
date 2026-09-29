@@ -1,6 +1,6 @@
 # Work spec: issues #2 and #3 fixes (goal session 2026-09-29)
 
-Repo: /Users/emanuelesabetta/Code/ai-maestro-web-scenario-tester (plugin `web-scenario-tester`, v0.1.7)
+Repo: this repo (plugin `web-scenario-tester`, v0.1.7 at spec time)
 Base: commit 923e880 (PR #4 merged — password-literal mandate already fixed upstream of this spec).
 
 ## Job A — Issue #3 regression guard (CI + validator)
@@ -90,4 +90,4 @@ canon. Minimal adoption, cite don't copy:
 - No version bump, no commit, no push — orchestrator commits.
 - Do not modify `scripts/publish.py` (CPV agent is working it concurrently) or anything under
   `.github/`.
-- Test after your change: `cd /Users/emanuelesabetta/Code/ai-maestro-web-scenario-tester && uv run pytest tests/ -q` (Job A) or, for Jobs B/C, verify the edited files with `tldr structure`/read-back and re-grep the edited markers.
+- Test after your change: from the repo root, `uv run pytest tests/ -q` (Job A) or, for Jobs B/C, verify the edited files with `tldr structure`/read-back and re-grep the edited markers.
