@@ -28,6 +28,10 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/amwst-validate-scenario.py" <file.scen.md
 - **Steps** are numbered strictly increasing (gaps warn; dupes / out-of-order
   error) and each carries **Action / Goal / Verify** (errors); **Creates /
   Modifies** are recommended (cleanup steps that use **Removes:** are exempt).
+- **Password guard (Rule 12)**: a quoted `governance_password` value must be an
+  env-var NAME (`"$MYAPP_TEST_PASSWORD"`), never a literal credential — a
+  literal is an ERROR (the password never passes through a model; prefer
+  `governancePasswordRef` and omit the field entirely).
 
 ## Output + exit code
 `VALIDATE <file>: <E> errors, <W> warnings`, then one line per finding
