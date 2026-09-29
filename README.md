@@ -135,7 +135,7 @@ Bundled under `scripts/` (invoked as `${CLAUDE_PLUGIN_ROOT}/scripts/<name>`):
 |---|---|
 | `amwst-scenario-step.sh <scen.md> list\|phases\|S<NNN>` | Read ONE step (or the id / phase list) from a scenario — so a run never re-reads the whole `.scen.md` each turn. |
 | `amwst-leantool.py tsc\|eslint\|vitest\|pytest\|log <args>` | Run the tool and emit ERRORS ONLY (a count + one line per error), exit-code faithful; `log <file>` extracts just the error lines from a logfile. |
-| `amwst-validate-scenario.py <file.scen.md> [--strict]` | Validate a scenario's frontmatter + phase/step structure; non-zero exit on any error. |
+| `amwst-validate-scenario.py <file.scen.md> [--strict]` | Lint a .scen.md: frontmatter keys, phase/step structure, and the Rule-12 password guard (governance_password must carry an env-var NAME, never a literal). |
 | `init-scenarios-folder.sh` | Bootstrap `tests/scenarios/` in a consumer project. |
 
 These exist to keep runs **token-cheap**: cost ≈ turns × per-turn-context, and the
@@ -233,7 +233,7 @@ surfaced by the `amwst-scenarios-rules` skill):
 | # | Rule | In one line |
 |---|---|---|
 | 0 | WHO-YOU-ARE | You are the human USER of the app, never an in-app agent. |
-| 1 | CLEAN-AFTER-YOURSELF | The last phase restores the system to its pre-test state. |
+| 1 | CLEAN-AFTER-YOURSELF | Cleanup is owed whenever the RUN ends — every exit path, not just the last phase (live artifact ledger + verify-by-absence). |
 | 2 | 0-IMPACT | Never touch existing user resources; only test-prefixed ones. |
 | 3 | STATE-WIPE | Back up + restore the config files a run may perturb. |
 | 4 | FIX-AS-YOU-GO | Fix a real app bug at its root the moment a step fails, then retry. |
@@ -244,7 +244,7 @@ surfaced by the `amwst-scenarios-rules` skill):
 | 9 | REPORT-FORMAT | The structured report has a fixed frontmatter + step-table shape. |
 | 10 | PHOTOSTORY | A screenshot per step in a timestamped per-run dir (auto-purged on a verified PASS). |
 | 11 | 11th-HOUR | After the run, produce concrete P0-P3 improvement proposals — the real product. |
-| 12 | SUDO-MODE | Re-enter the password on each destructive op that demands it. |
+| 12 | SUDO-MODE | The password never passes through a model — env-var ref → helper's stdin; a step that types a password is a bug. |
 | 13 | AUTONOMOUS-PROTOCOL | How an unattended overnight batch is structured (state machine + heartbeat). |
 | 14 | REPORTS-TO-PROJECT-ROOT | All reports / proposals / screenshots land under the main repo's `reports/`. |
 
