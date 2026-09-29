@@ -54,10 +54,12 @@ def validate(text):
         if version_val is not None and not version_val.startswith(('"', "'")):
             warns.append((None, 'version should be quoted (e.g. version: "1.0")'))
         # Rule 12: the credential never passes through a model — the frontmatter carries the
-        # env var NAME, never a literal. A quoted literal is a leak waiting to be committed.
-        # Quoted values arrive with their quotes, so strip them before matching the $VARNAME shape.
-        if gp_val and gp_val[:1] in ('"', "'") and gp_val.endswith(gp_val[0]) \
-                and not ENV_VAR_NAME_RE.match(gp_val[1:-1]):
+        # env var NAME, never a literal. ANY non-empty value that is not the $VARNAME shape is
+        # an error, quoted or not (YAML does not require quotes, so a quoted-only check has a
+        # bypass in exactly the leak class this guard exists to stop).
+        gp_name = gp_val[1:-1] if gp_val and len(gp_val) >= 2 and gp_val[:1] in ('"', "'") \
+            and gp_val.endswith(gp_val[0]) else gp_val
+        if gp_name and not ENV_VAR_NAME_RE.match(gp_name):
             errors.append((None, 'governance_password must carry the env var NAME ("$MYAPP_TEST_PASSWORD"), never a literal credential — see Rule 12 (THE PASSWORD NEVER PASSES THROUGH A MODEL)'))
 
     body = lines[fm_end + 1:] if fm_end else lines
