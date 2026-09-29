@@ -56,9 +56,12 @@ def validate(text):
         # Rule 12: the credential never passes through a model — the frontmatter carries the
         # env var NAME, never a literal. ANY non-empty value that is not the $VARNAME shape is
         # an error, quoted or not (YAML does not require quotes, so a quoted-only check has a
-        # bypass in exactly the leak class this guard exists to stop).
-        gp_name = gp_val[1:-1] if gp_val and len(gp_val) >= 2 and gp_val[:1] in ('"', "'") \
-            and gp_val.endswith(gp_val[0]) else gp_val
+        # bypass in exactly the leak class this guard exists to stop). A trailing `# comment`
+        # is legal YAML — strip it BEFORE the check or the sanctioned quoted form followed by
+        # a comment fails the dequote and produces a false positive.
+        gp_body = gp_val.split(" #", 1)[0].rstrip() if gp_val and " #" in gp_val else gp_val
+        gp_name = gp_body[1:-1] if gp_body and len(gp_body) >= 2 and gp_body[:1] in ('"', "'") \
+            and gp_body.endswith(gp_body[0]) else gp_body
         if gp_name and not ENV_VAR_NAME_RE.match(gp_name):
             errors.append((None, 'governance_password must carry the env var NAME ("$MYAPP_TEST_PASSWORD"), never a literal credential — see Rule 12 (THE PASSWORD NEVER PASSES THROUGH A MODEL)'))
 

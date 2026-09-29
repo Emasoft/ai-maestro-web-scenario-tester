@@ -84,6 +84,16 @@ def test_validator_flags_bare_literal():
     assert any("governance_password" in msg for _ln, msg in errors)
 
 
+def test_validator_accepts_env_var_name_with_trailing_comment():
+    """The sanctioned form followed by a YAML comment must NOT error (review round 2:
+    the dequote needs the comment stripped or it fails-closed on a correct file)."""
+    ok = "---\nnumber: 1\nname: x\nversion: \"1.0\"\ndescription: x\nclient: claude\n" \
+         "browser_stack: dev\ngovernance_password: \"$MYAPP_TEST_PASSWORD\"  # sudo note\n---\n\n" \
+         "## Phase CLEANUP\n\n#### S001: x\n- **Action:** x\n- **Goal:** x\n- **Verify:** x\n"
+    errors, _ = _validator.validate(ok)
+    assert not any("governance_password" in msg for _ln, msg in errors)
+
+
 def test_validator_flags_quoted_literal_in_sweep_regex():
     """The repo-sweep regex catches a bare literal too — pin it against regression."""
     line_bare = 'governance_password: hunter2'
